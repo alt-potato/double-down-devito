@@ -1,46 +1,29 @@
+# Stage 1: Build
 FROM node:24-alpine AS build
 
-# set working directory
-WORKDIR /src
+# Set working directory inside container
+WORKDIR /app
 
-# install dependencies
-COPY package.json package-lock.json ./
+# Copy package files and install dependencies
+COPY package*.json ./
 RUN npm ci
 
-# copy frontend code
-COPY . . 
+# Copy all source code (including src/app)
+COPY . .
 
-# build
+# Build the Next.js app
 RUN npm run build
 
-FROM nginx:alpine AS run
+# Stage 2: Run
+FROM node:24-alpine AS run
 
-# copy nginx config (if anything other than the default is required)
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-# copy built files from build
-COPY --from=build /src/out /usr/share/nginx/html
+# Copy built files and dependencies from build stage
+COPY --from=build /app ./
 
-# according to richard this does nothing :/
-EXPOSE 80
+# Expose default Next.js port
+EXPOSE 3000
 
-# run (in the foreground)! hopefully.
-CMD ["nginx", "-g", "daemon off;"] 
-
-# --- run frontend from node server (if SSR is required) ---
-# FROM node:24-alpine AS run
-
-# # set working directory
-# WORKDIR /app
-
-# # copy built files from build
-# COPY --from=build /src/.next ./.next
-# # copy static files
-# COPY --from=build /src/public ./public 
-
-# # install dependencies (without dev deps)
-# COPY package.json package-lock.json ./
-# RUN npm ci --omit=dev
-
-# # run! (on node server)
-# CMD ["npm", "run", "start"]
+# Start the Next.js server
+CMD ["npm", "start"]

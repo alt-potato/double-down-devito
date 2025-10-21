@@ -22,6 +22,10 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        // Use environment variable for port
+        var port = Environment.GetEnvironmentVariable("WEBSITES_PORT") ?? "5131";
+        builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
         builder.Configuration.AddJsonFile(
             "adminsetting.json",
             optional: true,

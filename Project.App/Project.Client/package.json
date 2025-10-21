@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "export": "next export",
     "lint": "oxlint . -D correctness --ignore-path .gitignore",
     "lint:fix": "oxlint . --fix -D correctness --ignore-path .gitignore",
     "format": "prettier --write .",

@@ -4,7 +4,7 @@ services:
     build:
       context: ./Project.App/Project.Client
     ports:
-      - 8080:80
+      - 8080:3000
     depends_on:
       - backend
   
@@ -13,24 +13,5 @@ services:
       context: ./Project.App/Project.Api
     environment:
       # binds to ConnectionStrings:DefaultConnection
-      - ConnectionStrings__DefaultConnection=Server=db;Database=DevitoDB;User Id=SA;Password=ThisIsTheBestPassword!!1!;TrustServerCertificate=True;
-    ports:
-      - 5131:5131
-    depends_on:
-      - db
-
-  db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    restart: always
-    environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=ThisIsTheBestPassword!!1!
-      - MSSQL_PID=Developer # set to developer cuz we're developing :)
-      - MSSQL_DATABASE=DevitoDB
-    ports: 
-      - 1433:1433
-    volumes:
-      - db_data:/var/opt/mssql
-
-volumes:
-  db_data: # persist database data
+      - Server=tcp:250908casinolobby.database.windows.net,1433;Initial Catalog=CasinoLobby;Persist Security Info=False;User ID=bigboss250908;Password=headHoncho!pa$$word;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
+      - WEBSITES_PORT=5131
