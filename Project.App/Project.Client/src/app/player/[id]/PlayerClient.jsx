@@ -9,6 +9,7 @@ export default function PlayerClient({ _id, initialBalance }) {
   const [getUserData] = useState();
   const [playerName, setPlayerName] = useState('');
   const [playerId, setPlayerId] = useState('');
+  const [playerPfp, setAvatarUrl] = useState('');
   const [balance, setBalance] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [creditsToAdd, setCreditsToAdd] = useState('');
@@ -47,8 +48,8 @@ export default function PlayerClient({ _id, initialBalance }) {
               setPlayerId(data.id);
               setPlayerName(data.name);
               setBalance(data.balance);
+              setAvatarUrl(data.avatarUrl);
             });
-            // setAvatarUrl(data.avatarUrl); google 
           }
         })  
   }, [router]);
@@ -101,9 +102,8 @@ export default function PlayerClient({ _id, initialBalance }) {
 
       // Later: PATCH to backend with new balance for player {id}
     
-    console.log('Patch requet sending');
-      fetch(`${apiBaseUrl}/api/user/${playerId}`, { 
-        credentials: 'include',
+    console.log('Patch request sending');
+      fetch(`${apiBaseUrl}/api/user/${playerId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -129,6 +129,8 @@ export default function PlayerClient({ _id, initialBalance }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 p-8 relative overflow-hidden flex items-center justify-center">
       <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto">
+        {/* Player Avatar */}
+        <img src={playerPfp} alt="Gamer Avatar" className="w-32 h-32 mb-4 rounded-full overflow-hidden border-4 border-yellow-600 shadow-lg" />
         {/* Player Name */}
         <h1 className="text-4xl font-bold bg-gradient-to-b from-yellow-400 via-yellow-500 to-yellow-600 bg-clip-text text-transparent mb-4 text-center">
           {playerName}
