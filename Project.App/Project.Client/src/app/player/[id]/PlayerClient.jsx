@@ -6,7 +6,8 @@ import AddCreditsModal from '../../components/AddCreditsModal';
 
 export default function PlayerClient({ _id, initialBalance }) {
   const router = useRouter();
-  const [playerName] = useState('Danny Devito');
+  const [getUserData] = useState();
+  const [playerName, setPlayerName] = useState('');
   const [balance, setBalance] = useState(initialBalance ?? 1000);
   const [showModal, setShowModal] = useState(false);
   const [creditsToAdd, setCreditsToAdd] = useState('');
@@ -28,7 +29,60 @@ export default function PlayerClient({ _id, initialBalance }) {
         console.error('Auth check failed:', err);
         router.replace('/login');
       });
+      
+    //get user {id} from auth connection
+
+    // fetch(`${apiBaseUrl}/api/user/${id}`)
+    //     .then((res) => {
+    //       if (!res.ok) {
+    //         console.log('Failed to fetch user data');
+    //         router.replace('/rooms');
+    //       } else {
+    //         res.json().then((data) => {
+    //           console.log('User found:', data);
+    //         });
+    //         setPlayerName(data.name);
+    //         setBalance(data.balance);
+    //         //setAvatarUrl(data.avatarUrl); google 
+    //       }
+    //     })
   }, [router]);
+
+//   -------------------- Reusable fetch user data function (not used) --------------------
+//   const userResponse = await fetch('https://localhost:7069/api/user/${userId}'), {
+//         method: 'GET',
+//         credentials: 'include',
+//         headers: {
+//           'Content-Type': 'application/json'
+//         }
+//       });
+
+//       if (!userResponse.ok) {
+//         throw new Error('Failed to fetch user: ${userResponse.status}');
+//       }
+
+//       // Parse the user data
+//       const userData = await userResponse.json();
+
+//       // Update state with the fetched data
+//       setPlayerName(userData.name);
+//       setBalance(userData.balance);
+//       setUserId(userData.id);
+//       setAvatarUrl(userData.avatarUrl);
+//       setEmail(userData.email);
+
+//       console.log('User data loaded from /api/user:', userData);
+
+//     }catch (err) {
+//       console.error('Error fetching user data:', err);
+//       setError(err.message);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   getUserData();
+// }, [router]);
 
   const handleAddCredits = (e) => {
     e.preventDefault();
