@@ -22,6 +22,7 @@ export default function PlayerClient({ _id, initialBalance }) {
         } else {
           res.json().then((data) => {
             console.log('Authenticated user:', data);
+            setPlayerName(data.claims[2].value);
           });
         }
       })
