@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Project.Api.Data;
 using Project.Api.Middleware;
 using Project.Api.Repositories;
+using Project.Api.Repositories.Interface;
 using Project.Api.Services;
 using Project.Api.Services.Interface;
 using Serilog;
@@ -61,6 +62,10 @@ public class Program
         builder.Services.AddDbContext<AppDbContext>(options =>
             options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
         );
+        
+        //do not delete me 3:<
+        builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IUserService, UserService>();
 
         builder.Services.AddScoped<IHandService, HandService>();
 
