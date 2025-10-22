@@ -48,6 +48,13 @@ namespace Project.Api.Repositories.Interface
             await _context.SaveChangesAsync();
         }
 
+        // Update user balance 
+        public async Task UpdateBalanceAsync(User user)
+        {
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+        }
+
         // Delete user by ID
         public async Task DeleteAsync(Guid id)
         {
