@@ -22,14 +22,14 @@ export default function PlayerClient({ _id }) {
         if (!res.ok) {
           router.replace('/login');
         } else {
-          res.json().then((data) => {
-            // console.log('Authenticated user:', data);
-            // setPlayerName(data.claims[2].value);
+          res.json().then((_data) => {
+            // console.log('Authenticated user:', _data);
+            // setPlayerName(_data.claims[2].value);
           });
         }
       })
-      .catch((err) => {
-        // console.error('Auth check failed:', err);
+      .catch((_err) => {
+        // console.error('Auth check failed:', _err);
         router.replace('/login');
       });
 
@@ -90,8 +90,8 @@ export default function PlayerClient({ _id }) {
       setCreditsToAdd('');
       setShowModal(false);
       // console.log('Balance updated successfully');
-    } catch (err) {
-      // console.error('Network error on PATCH', err);
+    } catch (_err) {
+      // console.error('Network error on PATCH', _err);
     }
   };
 
