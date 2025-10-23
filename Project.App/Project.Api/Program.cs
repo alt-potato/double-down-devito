@@ -1,12 +1,12 @@
 using System.Security.Claims;
 using System.Text;
-using System.Text.Json; // added for JSON parsing in OnCreatingTicket
+using System.Text.Json;
 using AutoMapper;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.OAuth;
-using Microsoft.AspNetCore.Http; // for Results
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Project.Api.Data;
