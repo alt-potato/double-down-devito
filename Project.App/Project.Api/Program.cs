@@ -11,6 +11,7 @@ using Project.Api.Repositories.Interface;
 using Project.Api.Services;
 using Project.Api.Services.Interface;
 using Project.Api.Utilities.Middleware;
+using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 
 namespace Project.Api;
@@ -21,20 +22,12 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-      
-        
-        
-
-
-        
-
         builder.Configuration.AddJsonFile(
             "adminsetting.json",
             optional: true,
             reloadOnChange: true
         );
 
-        // configure Serilog
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Console()
@@ -42,7 +35,6 @@ public class Program
 
         builder.Host.UseSerilog();
 
-        // use extension methods to configure services
         builder.Services.AddDatabase(builder.Configuration);
         builder.Services.AddApplicationServices();
         builder.Services.AddCorsPolicy();
@@ -55,13 +47,11 @@ public class Program
 
         if (File.Exists(".env.development"))
         {
-            // Docker / Azure: listen on the container port
             DotNetEnv.Env.Load(".env.development");
         }
 
         var app = builder.Build();
 
-        // optional/safe auto-migrate in other words our startup wont crash if the our migration model doenst match the DB
         using (var scope = app.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -79,24 +69,29 @@ public class Program
             }
         }
 
+        var fwd = new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor
+        };
+        fwd.KnownNetworks.Clear();
+        fwd.KnownProxies.Clear();
+        app.UseForwardedHeaders(fwd);
+
         app.UseMiddleware<GlobalExceptionHandler>();
 
         var port = Environment.GetEnvironmentVariable("PORT") ?? "80";
-        var httpsPort = 7069; // your local HTTPS port
+        var httpsPort = 7069;
 
         if (!File.Exists(".env.development"))
         {
-            // Docker / Azure: listen on the container port
             app.Urls.Add($"http://*:{port}");
         }
         else
         {
-            // Local: listen on localhost for HTTP and HTTPS
             app.Urls.Add($"http://localhost:{port}");
             app.Urls.Add($"https://localhost:{httpsPort}");
         }
 
-        // map default endpoint (shows connection string)
         app.MapGet(
             "/string",
             () =>
@@ -106,16 +101,14 @@ public class Program
             }
         );
 
-        // is development envrionment
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
             app.UseSwagger();
             app.UseSwaggerUI();
         }
-        
 
-        app.UseCors(ProgramExtensions.CorsPolicy); // Enable CORS with our policy
+        app.UseCors(ProgramExtensions.CorsPolicy);
         app.UseHttpsRedirection();
         app.UseAuthentication();
         app.UseAuthorization();
@@ -129,9 +122,6 @@ public static class ProgramExtensions
 {
     public const string CorsPolicy = "FrontendCors";
 
-    /// <summary>
-    /// Applies the configuration for the CORS policy.
-    /// </summary>
     public static IServiceCollection AddCorsPolicy(this IServiceCollection services)
     {
         services.AddCors(options =>
@@ -141,19 +131,20 @@ public static class ProgramExtensions
                 policy =>
                 {
                     policy
-                        .WithOrigins("http://localhost:3000", "https://localhost:3000") // Next.js frontend
+                        .WithOrigins(
+                            "http://localhost:3000",
+                            "https://localhost:3000",
+                            "https://dannyscasino-abhqdhcwabdaccfg.westus3-01.azurewebsites.net"
+                        )
                         .AllowAnyHeader()
                         .AllowAnyMethod()
-                        .AllowCredentials(); // Required for cookies
+                        .AllowCredentials();
                 }
             );
         });
         return services;
     }
 
-    /// <summary>
-    /// Registers the database.
-    /// </summary>
     public static IServiceCollection AddDatabase(
         this IServiceCollection services,
         IConfiguration configuration
@@ -165,43 +156,32 @@ public static class ProgramExtensions
         return services;
     }
 
-    /// <summary>
-    /// Registers the services and repositories used by the application.
-    /// </summary>
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
-        // scoped services
         services.AddScoped<IBlackjackService, BlackjackService>();
         services.AddScoped<IHandService, HandService>();
         services.AddScoped<IRoomService, RoomService>();
         services.AddScoped<IUserService, UserService>();
 
-        // singleton services
         services.AddHttpClient<IDeckApiService, DeckApiService>();
         services.AddSingleton<IRoomSSEService, RoomSSEService>();
 
-        // scoped repositories
         services.AddScoped<IHandRepository, HandRepository>();
         services.AddScoped<IRoomPlayerRepository, RoomPlayerRepository>();
         services.AddScoped<IRoomRepository, RoomRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
 
-        // automapper!!!
         services.AddAutoMapper(typeof(Program));
 
         return services;
     }
 
-    /// <summary>
-    /// Configures and registers the authentication services.
-    /// </summary>
     public static IServiceCollection AddAuth(
         this IServiceCollection services,
         IConfiguration configuration,
         IWebHostEnvironment environment
     )
     {
-        // sanity check for auth errors logging
         if (!environment.IsEnvironment("Testing"))
         {
             var gid = configuration["Google:ClientId"];
@@ -218,24 +198,16 @@ public static class ProgramExtensions
             );
         }
 
-        // Google OAuth
         services
             .AddAuthentication(options =>
             {
-                // where the app reads identity from on each request
                 options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                // how the app prompts an unauthenticated user to log in
-                // you can set DefaultChallengeScheme to Cookies instead but it didnt work before
                 options.DefaultChallengeScheme = GoogleDefaults.AuthenticationScheme;
             })
             .AddCookie(cookie =>
             {
-                // cross-site cookie SPA on :3000 to API on :7069
                 cookie.Cookie.SameSite = SameSiteMode.None;
-                // browsers require Secure when SameSite=None
                 cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-
-                // for APIs return status codes instead of 302 redirects
                 cookie.Events = new CookieAuthenticationEvents
                 {
                     OnRedirectToLogin = ctx =>
@@ -257,25 +229,18 @@ public static class ProgramExtensions
                 options.CallbackPath = "/auth/google/callback";
                 options.Scope.Add("email");
                 options.Scope.Add("profile");
-
-                // ensure we actually fetch profile claims from Google UserInfo endpoint
                 options.SaveTokens = true;
                 options.UserInformationEndpoint = "https://www.googleapis.com/oauth2/v3/userinfo";
                 options.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
                 options.ClaimActions.MapJsonKey(ClaimTypes.Name, "name");
                 options.ClaimActions.MapJsonKey("picture", "picture");
                 options.ClaimActions.MapJsonKey("email_verified", "email_verified");
-
-                // Upsert user into DB when Google signs in successfully
                 options.Events = new OAuthEvents
                 {
                     OnCreatingTicket = async ctx =>
                     {
-                        var log = ctx.HttpContext.RequestServices.GetRequiredService<
-                            ILogger<Program>
-                        >();
+                        var log = ctx.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
 
-                        // fetch the full user JSON from Google's userinfo endpoint
                         var request = new System.Net.Http.HttpRequestMessage(
                             System.Net.Http.HttpMethod.Get,
                             ctx.Options.UserInformationEndpoint
@@ -295,8 +260,7 @@ public static class ProgramExtensions
                         var j = userJson.RootElement;
 
                         var email = j.TryGetProperty("email", out var e) ? e.GetString() : null;
-                        var verified =
-                            j.TryGetProperty("email_verified", out var v) && v.GetBoolean();
+                        var verified = j.TryGetProperty("email_verified", out var v) && v.GetBoolean();
                         var name = j.TryGetProperty("name", out var n) ? n.GetString() : null;
                         var picture = j.TryGetProperty("picture", out var p) ? p.GetString() : null;
 
