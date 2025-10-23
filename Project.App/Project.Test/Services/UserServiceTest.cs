@@ -207,7 +207,9 @@ public class UserServiceTest
         var newBalance = 2000.0;
 
         _userRepositoryMock.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(user);
-        _userRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+        _userRepositoryMock
+            .Setup(r => r.UpdateBalanceAsync(It.IsAny<User>()))
+            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _service.UpdateUserBalanceAsync(userId, newBalance);
@@ -217,7 +219,7 @@ public class UserServiceTest
         result.Id.Should().Be(userId);
         result.Balance.Should().Be(newBalance);
         _userRepositoryMock.Verify(
-            r => r.UpdateAsync(It.Is<User>(u => u.Id == userId && u.Balance == newBalance)),
+            r => r.UpdateBalanceAsync(It.Is<User>(u => u.Id == userId && u.Balance == newBalance)),
             Times.Once
         );
     }

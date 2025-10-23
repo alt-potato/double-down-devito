@@ -1,5 +1,13 @@
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
+using AutoMapper;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.Authentication.OAuth;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Project.Api.Data;
 using Project.Api.Repositories;
