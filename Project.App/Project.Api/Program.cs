@@ -35,7 +35,8 @@ public class Program
                     policy
                         .WithOrigins("http://localhost:3000", "https://localhost:3000") //  Next.js dev origin add other frontend origins below this when we move to server
                         .AllowAnyHeader()
-                        .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                        // .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                        .AllowAnyMethod() // allow PUT/PATCH/DELETE/etc for preflight
                         .AllowCredentials(); // required cookie for auth
                 }
             );
@@ -62,7 +63,7 @@ public class Program
         builder.Services.AddDbContext<AppDbContext>(options =>
             options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
         );
-        
+
         //do not delete me 3:<
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IUserService, UserService>();
@@ -77,6 +78,8 @@ public class Program
         builder.Services.AddAutoMapper(typeof(Program));
 
         // CORS configuration
+        // the code below was redundant so I think this caused the errors earlier just leaving it commented in case it was important
+        /*
         builder.Services.AddCors(options =>
         {
             options.AddDefaultPolicy(policy =>
@@ -88,6 +91,7 @@ public class Program
                     .AllowCredentials(); // Required for cookies
             });
         });
+        */
 
         builder.Services.AddAuthorization();
 
@@ -142,37 +146,64 @@ public class Program
                 options.ClientId = builder.Configuration["Google:ClientId"]!; //  from secrets / config
                 options.ClientSecret = builder.Configuration["Google:ClientSecret"]!; //  from secrets / config
                 options.CallbackPath = "/auth/google/callback"; //  google redirects here after login if we change this we need to change it on google cloud as well!
-                //options.Events = new OAuthEvents
-                { //TEMPORARILY COMMENTED OUR BELOW BECAUSE IT WAS MESSING WITH GOOGLE AUTH LOGIN FOR SOME REASON GOTTA CHECK THIS LATER
+                options.Scope.Add("email");
+                options.Scope.Add("profile");
+
+                // this allows migrations, upsert user into our DB when Google signs in successfully
+                options.Events = new OAuthEvents
+                {
                     // OnCreatingTicket = async ctx => //currently we are accessing the user json that we get back from google oauth and using it as a quick validation check since email is our unique primary identified on users rn
-                    { /*
-                        var email = ctx.User.GetProperty("email").GetString(); //all of these checks are quick validation can be moved elsewhere when we decide where to put it
+                    OnCreatingTicket = async ctx =>
+                    {
+                        var log = ctx.HttpContext.RequestServices.GetRequiredService<
+                            ILogger<Program>
+                        >();
+                        var j = ctx.User;
+
+                        var email = j.TryGetProperty("email", out var e) ? e.GetString() : null;
                         var verified =
-                            ctx.User.TryGetProperty("email_verified", out var ev)
-                            && ev.GetBoolean();
-                        var name = ctx.User.TryGetProperty("name", out var n)
-                            ? n.GetString()
-                            : null;
-                        var picture = ctx.User.TryGetProperty("picture", out var p)
-                            ? p.GetString()
-                            : null;
+                            j.TryGetProperty("email_verified", out var v) && v.GetBoolean();
+                        var name = j.TryGetProperty("name", out var n) ? n.GetString() : null;
+                        var picture = j.TryGetProperty("picture", out var p) ? p.GetString() : null;
+
+                        log.LogInformation(
+                            "[OAuth] CreatingTicket: email={Email}, verified={Verified}, name={Name}",
+                            email,
+                            verified,
+                            name
+                        );
 
                         if (string.IsNullOrWhiteSpace(email) || !verified)
                         {
+                            log.LogWarning("[OAuth] Missing or unverified email; failing ticket.");
                             ctx.Fail("Google email must be present and verified.");
                             return;
                         }
 
-                        var svc =
+                        var users =
                             ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
-                        await svc.UpsertGoogleUserByEmailAsync(email, name, picture);
-                    */
-                    }
-                }
-                ;
+                        var user = await users.UpsertGoogleUserByEmailAsync(email!, name, picture);
+
+                        log.LogInformation(
+                            "[OAuth] Upsert complete: UserId={UserId}, Email={UserEmail}",
+                            user.Id,
+                            user.Email
+                        );
+                    },
+                };
             });
 
         var app = builder.Build();
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Database.Migrate();
+        }
+
+        // Re-ordered to ensure CORS headers are applied to preflight (OPTIONS) before anything can short-circuit
+        app.UseHttpsRedirection();
+        app.UseCors(CorsPolicy); // Enable CORS with our policy
 
         app.UseMiddleware<GlobalExceptionHandler>();
 
@@ -193,8 +224,6 @@ public class Program
             app.UseSwaggerUI();
         }
 
-        app.UseCors(CorsPolicy); // Enable CORS with our policy
-        app.UseHttpsRedirection();
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();
