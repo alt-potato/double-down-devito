@@ -60,30 +60,34 @@ export default function PlayerClient({ _id, initialBalance }) {
       alert('Please enter a valid amount greater than 0');
       return;
     }
+    
+    const newBalance = balance + amount;
 
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/user/${playerId}/balance`, {
+      console.log('New total shold be:', newBalance);
+      const response = await fetch(`${API_URL}/api/user/${playerId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ balance: newBalance }),
       });
+      console.log('Add credits response status:', response.status);
 
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to add credits');
       }
 
-      const data = await response.json();
-      console.log('Credits added successfully. New balance:', data.balance);
+      //const data = await response.json();
+      //console.log('Credits added successfully. New balance:', data.balance);
 
       // Update local state with new balance from server
-      setBalance(data.balance);
-      setCreditsToAdd(0);
+      setBalance(newBalance);
+      setCreditsToAdd('');
       setShowModal(false);
     } catch (error) {
       console.error('Error adding credits:', error);

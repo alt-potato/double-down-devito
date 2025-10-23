@@ -8,21 +8,20 @@ namespace Project.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize] // Require authentication for all endpoints
     public class UserController : ControllerBase
     {
-        private readonly IUserRepository _userRepository;
+        private readonly IUserService _userService;
 
-        public UserController(IUserRepository userRepository)
+        public UserController(IUserService userService)
         {
-            _userRepository = userRepository;
+            _userService = userService;
         }
 
         // GET: api/user
         [HttpGet]
         public async Task<ActionResult<IEnumerable<User>>> GetAllUsers()
         {
-            var users = await _userRepository.GetAllAsync();
+            var users = await _userService.GetAllUsersAsync();
             return Ok(users);
         }
 
@@ -30,7 +29,7 @@ namespace Project.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<User>> GetUserById(Guid id)
         {
-            var user = await _userRepository.GetByIdAsync(id);
+            var user = await _userService.GetUserByIdAsync(id);
             if (user == null)
                 return NotFound($"User with ID {id} not found.");
             return Ok(user);
@@ -43,7 +42,7 @@ namespace Project.Api.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            await _userRepository.AddAsync(user);
+            await _userService.CreateUserAsync(user);
             return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, user);
         }
 
@@ -54,7 +53,7 @@ namespace Project.Api.Controllers
             if (id != user.Id)
                 return BadRequest("User ID mismatch.");
 
-            var existingUser = await _userRepository.GetByIdAsync(id);
+            var existingUser = await _userService.GetUserByIdAsync(id);
             if (existingUser == null)
                 return NotFound($"User with ID {id} not found.");
 
@@ -63,7 +62,34 @@ namespace Project.Api.Controllers
             existingUser.Email = user.Email;
             existingUser.Balance = user.Balance;
 
-            await _userRepository.UpdateAsync(existingUser);
+            await _userService.UpdateUserAsync(id, existingUser);
+            return NoContent();
+        }
+
+        // PATCH: api/user/{id}
+        [HttpPatch("{id}")]
+        [Authorize]
+        public async Task<IActionResult> UpdateBalance(
+            Guid id,
+            [FromBody] UpdateBalanceRequest body
+        )
+        {
+            if (body is null)
+                return BadRequest("Missing body.");
+
+            // only allow the logged-in user to change their own balance
+            var emailClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+            if (string.IsNullOrWhiteSpace(emailClaim))
+                return Unauthorized();
+
+            var me = await _userService.GetUserByEmailAsync(emailClaim);
+            if (me is null)
+                return Unauthorized();
+
+            if (me.Id != id)
+                return Forbid(); // 403 if trying to edit someone else
+
+            await _userService.UpdateUserBalanceAsync(id, body.Balance);
             return NoContent();
         }
 
@@ -71,11 +97,11 @@ namespace Project.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(Guid id)
         {
-            var existingUser = await _userRepository.GetByIdAsync(id);
+            var existingUser = await _userService.GetUserByIdAsync(id);
             if (existingUser == null)
                 return NotFound($"User with ID {id} not found.");
 
-            await _userRepository.DeleteAsync(id);
+            await _userService.DeleteUserAsync(id);
             return NoContent();
         }
 
@@ -88,7 +114,7 @@ namespace Project.Api.Controllers
             if (email is null)
                 return Unauthorized();
 
-            var u = await users.GetByEmailAsync(email.Value);
+            var u = await users.GetUserByEmailAsync(email.Value);
             if (u is null)
                 return NotFound();
             //temporary user dto since we dont have one made
@@ -103,33 +129,7 @@ namespace Project.Api.Controllers
                 }
             );
         }
-
-        // PATCH: api/user/{id}/balance
-        [HttpPatch("{id}/balance")]
-        public async Task<IActionResult> UpdateBalance(Guid id, [FromBody] UpdateBalanceRequest request)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var existingUser = await _userRepository.GetByIdAsync(id);
-            if (existingUser == null)
-                return NotFound($"User with ID {id} not found.");
-
-            // Add the credits to the current balance
-            existingUser.Balance += request.Amount;
-
-            // Ensure balance doesn't go negative
-            if (existingUser.Balance < 0)
-                existingUser.Balance = 0;
-
-            await _userRepository.UpdateAsync(existingUser);
-
-            return Ok(new { balance = existingUser.Balance });
-        }
     }
 
-    public class UpdateBalanceRequest
-    {
-        public double Amount { get; set; }
-    }
+    public record UpdateBalanceRequest(double Balance);
 }
