@@ -18,7 +18,7 @@ public class AuthController : ControllerBase
         Console.WriteLine($"[AUTH] Login called with returnUrl: {returnUrl}");
 
         // Allow frontend URLs (localhost:3000 or your production frontend)
-        var allowedOrigins = new[] { "http://localhost:3000", "https://localhost:3000" };
+        var allowedOrigins = new[] { "http://localhost:3000", "https://localhost:3000", "https://dannyscasino-abhqdhcwabdaccfg.westus3-01.azurewebsites.net/" };
         var safe = "/swagger"; // default fallback
 
         if (!string.IsNullOrEmpty(returnUrl))

@@ -17,9 +17,12 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Use environment variable for port
-        var port = Environment.GetEnvironmentVariable("WEBSITES_PORT") ?? "5131";
-        builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+      
+        
+        
+
+
+        
 
         builder.Configuration.AddJsonFile(
             "adminsetting.json",
@@ -46,9 +49,30 @@ public class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
 
+        if (File.Exists(".env.development"))
+        {
+            // Docker / Azure: listen on the container port
+            DotNetEnv.Env.Load(".env.development");
+        }
+
         var app = builder.Build();
 
         app.UseMiddleware<GlobalExceptionHandler>();
+
+        var port = Environment.GetEnvironmentVariable("PORT") ?? "80";
+        var httpsPort = 7069; // your local HTTPS port
+
+        if (!File.Exists(".env.development"))
+        {
+            // Docker / Azure: listen on the container port
+            app.Urls.Add($"http://*:{port}");
+        }
+        else
+        {
+            // Local: listen on localhost for HTTP and HTTPS
+            app.Urls.Add($"http://localhost:{port}");
+            app.Urls.Add($"https://localhost:{httpsPort}");
+        }
 
         // map default endpoint (shows connection string)
         app.MapGet(
@@ -67,6 +91,7 @@ public class Program
             app.UseSwagger();
             app.UseSwaggerUI();
         }
+        
 
         app.UseCors(ProgramExtensions.CorsPolicy); // Enable CORS with our policy
         app.UseHttpsRedirection();

@@ -4,14 +4,16 @@ services:
     build:
       context: ./Project.App/Project.Client
     ports:
-      - 8080:3000
+      - 3000:3000
     depends_on:
       - backend
   
   backend:
     build:
       context: ./Project.App/Project.Api
+    ports:
+      - 80:80
     environment:
       # binds to ConnectionStrings:DefaultConnection
       - Server=tcp:250908casinolobby.database.windows.net,1433;Initial Catalog=CasinoLobby;Persist Security Info=False;User ID=bigboss250908;Password=headHoncho!pa$$word;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
-      - WEBSITES_PORT=5131
+      -

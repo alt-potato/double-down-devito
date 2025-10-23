@@ -1,29 +1,24 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 
 # set working directory
-WORKDIR /src
+WORKDIR /MyApp
 
 # install dependencies
-COPY *.csproj ./
-# COPY ../../*.sln ./ # may be necessary?
-RUN dotnet restore
-
 # copy backend code
-COPY . .
-
+COPY ./ ./
 # build (publish)
-RUN dotnet publish -c Release -o /app/publish --no-restore
+RUN dotnet restore .
+RUN dotnet publish -c Release -o out
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS run
 
 # set working directory
-WORKDIR /app
+WORKDIR /MyApp
 
 # copy built files from build
-COPY --from=build /app/publish .
-
+COPY --from=build /MyApp/out /MyApp
 # according to richard this does nothing :/
-EXPOSE 5131
+EXPOSE 80
 
 # run! hopefully.
 ENTRYPOINT ["dotnet", "Project.Api.dll"]
