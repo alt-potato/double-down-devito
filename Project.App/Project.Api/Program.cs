@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json; // added for JSON parsing in OnCreatingTicket
 using AutoMapper;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -112,12 +113,11 @@ public class Program
             );
         }
 
-        // Google OAuth
         builder
             .Services.AddAuthentication(options =>
             {
                 options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme; // where the app reads identity from on each request
-                options.DefaultChallengeScheme = GoogleDefaults.AuthenticationScheme; // how the app prompts an unauthenticated user to log in
+                options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme; //  changed from Google to Cookie so failed auth returns 401 instead of redirecting to Google
             })
             .AddCookie(cookie =>
             {
@@ -149,16 +149,41 @@ public class Program
                 options.Scope.Add("email");
                 options.Scope.Add("profile");
 
+                // ensure we actually fetch profile claims from Google UserInfo endpoint
+                options.SaveTokens = true;
+                options.UserInformationEndpoint = "https://www.googleapis.com/oauth2/v3/userinfo";
+                options.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
+                options.ClaimActions.MapJsonKey(ClaimTypes.Name, "name");
+                options.ClaimActions.MapJsonKey("picture", "picture");
+                options.ClaimActions.MapJsonKey("email_verified", "email_verified");
+
                 // this allows migrations, upsert user into our DB when Google signs in successfully
                 options.Events = new OAuthEvents
                 {
-                    // OnCreatingTicket = async ctx => //currently we are accessing the user json that we get back from google oauth and using it as a quick validation check since email is our unique primary identified on users rn
                     OnCreatingTicket = async ctx =>
                     {
                         var log = ctx.HttpContext.RequestServices.GetRequiredService<
                             ILogger<Program>
                         >();
-                        var j = ctx.User;
+
+                        // ---- fetch the full user JSON from Google's userinfo endpoint ----
+                        var request = new System.Net.Http.HttpRequestMessage(
+                            System.Net.Http.HttpMethod.Get,
+                            ctx.Options.UserInformationEndpoint
+                        );
+                        request.Headers.Authorization =
+                            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                                "Bearer",
+                                ctx.AccessToken
+                            );
+
+                        var response = await ctx.Backchannel.SendAsync(request);
+                        response.EnsureSuccessStatusCode();
+
+                        using var userJson = JsonDocument.Parse(
+                            await response.Content.ReadAsStringAsync()
+                        );
+                        var j = userJson.RootElement;
 
                         var email = j.TryGetProperty("email", out var e) ? e.GetString() : null;
                         var verified =
@@ -180,15 +205,33 @@ public class Program
                             return;
                         }
 
-                        var users =
-                            ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
-                        var user = await users.UpsertGoogleUserByEmailAsync(email!, name, picture);
+                        try
+                        {
+                            // Ensure DB is accessible even if a migration was recently applied
+                            using var scope = ctx.HttpContext.RequestServices.CreateScope();
+                            var users = scope.ServiceProvider.GetRequiredService<IUserService>();
 
-                        log.LogInformation(
-                            "[OAuth] Upsert complete: UserId={UserId}, Email={UserEmail}",
-                            user.Id,
-                            user.Email
-                        );
+                            var user = await users.UpsertGoogleUserByEmailAsync(
+                                email!,
+                                name,
+                                picture
+                            );
+
+                            log.LogInformation(
+                                "[OAuth] Upsert complete: UserId={UserId}, Email={UserEmail}",
+                                user.Id,
+                                user.Email
+                            );
+                        }
+                        catch (Exception ex)
+                        {
+                            log.LogError(
+                                ex,
+                                "[OAuth] Error during UpsertGoogleUserByEmailAsync for {Email}",
+                                email
+                            );
+                            ctx.Fail("Internal error during user creation.");
+                        }
                     },
                 };
             });
@@ -198,7 +241,18 @@ public class Program
         using (var scope = app.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Database.Migrate();
+            try
+            {
+                db.Database.Migrate();
+                Log.Information("[Startup] Database migration check complete.");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(
+                    ex,
+                    "[Startup] Database migration skipped or failed. Continuing startup."
+                );
+            }
         }
 
         // Re-ordered to ensure CORS headers are applied to preflight (OPTIONS) before anything can short-circuit

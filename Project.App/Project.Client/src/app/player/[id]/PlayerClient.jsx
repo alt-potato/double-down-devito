@@ -90,36 +90,47 @@ export default function PlayerClient({ _id, initialBalance }) {
 //   getUserData();
 // }, [router]);
 
-  const handleAddCredits = (e) => {
-    console.log('Balance update started');
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7069';
-    e.preventDefault();
-    const amount = parseFloat(creditsToAdd);
-    if (!isNaN(amount) && amount > 0) {
-      setBalance((prev) => prev + amount);
-      setCreditsToAdd('');
-      setShowModal(false);
+const handleAddCredits = async (e) => {
+  e.preventDefault();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7069';
 
-      // Later: PATCH to backend with new balance for player {id}
-    
+  const amount = parseFloat(creditsToAdd);
+  if (Number.isNaN(amount) || amount <= 0) return;
+
+  // compute first (state updates are async)
+  const newBalance = balance + amount;
+
+  try {
     console.log('Patch request sending');
-      fetch(`${apiBaseUrl}/api/user/${playerId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ id: playerId, balance: balance})
-      })
-        .then((res) => {
-          console.log('Balance up date response received');
-          if (!res.ok) {
-            console.log('Failed to update balance');
-          } else {
-            console.log('Balance updated successfully');
-          }
-        }) 
+    const res = await fetch(`${apiBaseUrl}/api/user/${playerId}`, {
+      method: 'PATCH',
+      credentials: 'include',            // <-- send the auth cookie
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ balance: newBalance }), // <-- matches UpdateBalanceRequest
+    });
+
+    console.log('Balance update response received');
+
+    if (!res.ok) {
+      console.log('Failed to update balance', res.status, await res.text());
+      if (res.status === 401) {
+        // lost auth — kick to login
+        router.replace('/login');
+      }
+      return;
     }
-  };
+
+    // success: update UI
+    setBalance(newBalance);
+    setCreditsToAdd('');
+    setShowModal(false);
+    console.log('Balance updated successfully');
+  } catch (err) {
+    console.error('Network error on PATCH', err);
+  }
+};
 
   const handleCloseModal = () => {
     setShowModal(false);

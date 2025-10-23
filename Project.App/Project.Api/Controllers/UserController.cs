@@ -72,15 +72,27 @@ namespace Project.Api.Controllers
         // PATCH: api/user/{id}
         [HttpPatch("{id}")]
         [Authorize]
-        public async Task<IActionResult> UpdateBalance(Guid id, double balance)
+        public async Task<IActionResult> UpdateBalance(
+            Guid id,
+            [FromBody] UpdateBalanceRequest body
+        )
         {
-            var existingUser = await _userService.GetUserByIdAsync(id);
-            if (existingUser == null)
-                return NotFound($"User with ID {id} not found.");
+            if (body is null)
+                return BadRequest("Missing body.");
 
-            // Update allowed fields
-            // existingUser.Balance = balance;
-            await _userService.UpdateUserBalanceAsync(id, balance);
+            // only allow the logged-in user to change their own balance
+            var emailClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+            if (string.IsNullOrWhiteSpace(emailClaim))
+                return Unauthorized();
+
+            var me = await _userService.GetUserByEmailAsync(emailClaim);
+            if (me is null)
+                return Unauthorized();
+
+            if (me.Id != id)
+                return Forbid(); // 403 if trying to edit someone else
+
+            await _userService.UpdateUserBalanceAsync(id, body.Balance);
             return NoContent();
         }
 
@@ -121,4 +133,6 @@ namespace Project.Api.Controllers
             );
         }
     }
+
+    public record UpdateBalanceRequest(double Balance);
 }
