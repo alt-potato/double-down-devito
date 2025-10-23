@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -7,6 +6,7 @@ namespace Project.Api.Models
     public class User
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public Guid Id { get; set; }
 
         [Required, MaxLength(256)]
@@ -20,6 +20,6 @@ namespace Project.Api.Models
         [MaxLength(512)]
         public string? AvatarUrl { get; set; } //we will send this to the front for our pfp
 
-        public ICollection<RoomPlayer> RoomPlayers { get; set; } = new List<RoomPlayer>();
+        public ICollection<RoomPlayer> RoomPlayers { get; set; } = [];
     }
 }

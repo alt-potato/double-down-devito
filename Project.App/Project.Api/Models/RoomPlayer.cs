@@ -1,14 +1,13 @@
-using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Numerics;
-using Project.Api.Enums;
+using Project.Api.Utilities.Enums;
 
 namespace Project.Api.Models;
 
 public class RoomPlayer
 {
     [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public Guid Id { get; set; }
 
     [Required]

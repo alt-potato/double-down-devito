@@ -1,12 +1,12 @@
+using Project.Api.Models;
+
+namespace Project.Api.Services.Interface;
+
 /*
     Name: IHandService.cs
     Description: Interface for Hand service
     Children: HandService.cs
 */
-using Project.Api.Models;
-
-namespace Project.Api.Services;
-
 public interface IHandService
 {
     // Define Fields
@@ -20,12 +20,6 @@ public interface IHandService
 
     Task<Hand> UpdateHandAsync(Guid handId, Hand hand);
 
-    Task<Hand> PatchHandAsync(
-        Guid handId,
-        int? Order = null,
-        string? CardsJson = null,
-        int? Bet = null
-    );
-
+    Task<Hand> PatchHandAsync(Guid handId, int? Order = null, int? Bet = null);
     Task<Hand> DeleteHandAsync(Guid handId);
 }

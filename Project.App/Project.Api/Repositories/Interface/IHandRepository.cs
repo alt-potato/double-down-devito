@@ -1,14 +1,12 @@
-/*
-    Name: IHandRepository.cs
-    Description: Interface for Hand repository
-    Children: HandRepository.cs
-*/
-using Project.Api.Enums;
 using Project.Api.Models;
-using Project.Api.Repositories;
 
-namespace Project.Api.Repositories
+namespace Project.Api.Repositories.Interface
 {
+    /*
+        Name: IHandRepository.cs
+        Description: Interface for Hand repository
+        Children: HandRepository.cs
+    */
     public interface IHandRepository
     {
         // Define Fields
@@ -29,12 +27,7 @@ namespace Project.Api.Repositories
         Task<Hand> UpdateHandAsync(Guid handId, Hand hand);
 
         // Partially update an existing hand
-        Task<Hand> PatchHandAsync(
-            Guid handId,
-            int? Order = null,
-            string? CardsJson = null,
-            int? Bet = null
-        );
+        Task<Hand> PatchHandAsync(Guid handId, int? Order = null, int? Bet = null);
 
         // Delete a hand
         Task<Hand> DeleteHandAsync(Guid handId);

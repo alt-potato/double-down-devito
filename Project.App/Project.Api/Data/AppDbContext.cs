@@ -5,8 +5,6 @@ namespace Project.Api.Data;
 
 public partial class AppDbContext : DbContext
 {
-    public AppDbContext() { }
-
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options) { }
 
@@ -18,14 +16,11 @@ public partial class AppDbContext : DbContext
     /// <summary>
     /// Provides the configuration for TradeHubContext models.
     /// Any custom configurations should be defined in <see cref="OnModelCreatingPartial"/>.
+    /// DO NOT MODIFY THIS METHOD.
     /// </summary>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
-        // Configure GameState as JSON column for SQL Server
-        modelBuilder.Entity<Room>().Property(r => r.GameState).HasColumnType("nvarchar(max)");
-
         OnModelCreatingPartial(modelBuilder);
     }
 

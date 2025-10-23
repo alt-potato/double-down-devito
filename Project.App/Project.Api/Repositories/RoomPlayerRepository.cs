@@ -1,13 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Project.Api.Data;
-using Project.Api.Enums;
 using Project.Api.Models;
 using Project.Api.Repositories.Interface;
 using Project.Api.Utilities;
+using Project.Api.Utilities.Enums;
 
 namespace Project.Api.Repositories;
 
@@ -132,13 +128,32 @@ public class RoomPlayerRepository(AppDbContext context) : IRoomPlayerRepository
         await _context.SaveChangesAsync();
     }
 
-    public async Task UpdatePlayerBalanceAsync(Guid id, long balance)
+    /// <summary>
+    /// Adds the specified amount to the player's balance (can be negative).
+    /// </summary>
+    public async Task UpdatePlayerBalanceAsync(Guid id, long change)
     {
         RoomPlayer roomPlayer =
             await _context.RoomPlayers.FindAsync(id)
             ?? throw new NotFoundException("Player not found");
 
-        roomPlayer.Balance = balance;
+        roomPlayer.Balance += change;
+        await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Batch updates all players in a room with a single database operation.
+    /// </summary>
+    public async Task UpdatePlayersInRoomAsync(Guid roomId, Action<RoomPlayer> updateAction)
+    {
+        var players = await _context.RoomPlayers.Where(rp => rp.RoomId == roomId).ToListAsync();
+
+        foreach (var player in players)
+        {
+            updateAction(player);
+            _context.Entry(player).State = EntityState.Modified;
+        }
+
         await _context.SaveChangesAsync();
     }
 }

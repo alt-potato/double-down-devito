@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Project.Api.Enums;
 using Project.Api.Models;
+using Project.Api.Utilities.Enums;
 
 namespace Project.Api.Repositories.Interface
 {
@@ -24,5 +20,6 @@ namespace Project.Api.Repositories.Interface
         Task<RoomPlayer?> GetRoomHostAsync(Guid roomId);
         Task UpdatePlayerStatusAsync(Guid id, Status status);
         Task UpdatePlayerBalanceAsync(Guid id, long balance);
+        Task UpdatePlayersInRoomAsync(Guid roomId, Action<RoomPlayer> updateAction);
     }
 }

@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Project.Api.Data;
 using Project.Api.Models;
+using Project.Api.Repositories.Interface;
 
-namespace Project.Api.Repositories.Interface
+namespace Project.Api.Repositories
 {
     public class UserRepository : IUserRepository
     {
@@ -28,7 +29,10 @@ namespace Project.Api.Repositories.Interface
         //  Get user by email
         public async Task<User?> GetByEmailAsync(string email)
         {
-            return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            var normalized = email.Trim().ToLower(); //normalize emails to lowercase
+            return await _context
+                .Users.AsNoTracking() //we only need to read this
+                .FirstOrDefaultAsync(u => u.Email == normalized);
         }
 
         // Add new user
