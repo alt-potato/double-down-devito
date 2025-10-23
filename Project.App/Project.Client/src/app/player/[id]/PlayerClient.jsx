@@ -35,6 +35,7 @@ export default function PlayerClient({ _id, initialBalance }) {
           setPlayerName(data.name);
           setPlayerId(data.id);
           setBalance(data.balance);
+          setAvatarUrl(data.avatarUrl);
         }
       })
       .catch((err) => {
