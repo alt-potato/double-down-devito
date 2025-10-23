@@ -2,19 +2,19 @@ using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Project.Api.Controllers;
 using Project.Api.Models;
-using Project.Api.Services.Interface;
+using Project.Api.Repositories.Interface;
 
 namespace Project.Tests.Controllers
 {
     public class UserControllerTests
     {
-        private readonly Mock<IUserService> _mockSvc;
+        private readonly Mock<IUserRepository> _mockRepo;
         private readonly UserController _controller;
 
         public UserControllerTests()
         {
-            _mockSvc = new Mock<IUserService>();
-            _controller = new UserController(_mockSvc.Object);
+            _mockRepo = new Mock<IUserRepository>();
+            _controller = new UserController(_mockRepo.Object);
         }
 
         [Fact]
@@ -36,7 +36,7 @@ namespace Project.Tests.Controllers
                     Email = "leo@example.com",
                 },
             };
-            _mockSvc.Setup(s => s.GetAllUsersAsync()).ReturnsAsync(users);
+            _mockRepo.Setup(repo => repo.GetAllAsync()).ReturnsAsync(users);
 
             // Act
             var result = await _controller.GetAllUsers();
@@ -58,7 +58,7 @@ namespace Project.Tests.Controllers
                 Name = "Sneha",
                 Email = "sneha@example.com",
             };
-            _mockSvc.Setup(s => s.GetUserByIdAsync(userId)).ReturnsAsync(user);
+            _mockRepo.Setup(repo => repo.GetByIdAsync(userId)).ReturnsAsync(user);
 
             // Act
             var result = await _controller.GetUserById(userId);
@@ -74,7 +74,7 @@ namespace Project.Tests.Controllers
         {
             // Arrange
             var userId = Guid.NewGuid();
-            _mockSvc.Setup(s => s.GetUserByIdAsync(userId)).ReturnsAsync((User?)null);
+            _mockRepo.Setup(repo => repo.GetByIdAsync(userId)).ReturnsAsync((User?)null);
 
             // Act
             var result = await _controller.GetUserById(userId);
@@ -93,7 +93,7 @@ namespace Project.Tests.Controllers
                 Name = "Sneha",
                 Email = "sneha@example.com",
             };
-            _mockSvc.Setup(s => s.CreateUserAsync(It.IsAny<User>())).ReturnsAsync((User u) => u);
+            _mockRepo.Setup(repo => repo.AddAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
 
             // Act
             var result = await _controller.CreateUser(user);
@@ -112,10 +112,8 @@ namespace Project.Tests.Controllers
             var existingUser = new User { Id = userId, Name = "Old Name" };
             var updatedUser = new User { Id = userId, Name = "New Name" };
 
-            _mockSvc.Setup(s => s.GetUserByIdAsync(userId)).ReturnsAsync(existingUser);
-            _mockSvc
-                .Setup(s => s.UpdateUserAsync(userId, It.IsAny<User>()))
-                .ReturnsAsync(updatedUser);
+            _mockRepo.Setup(repo => repo.GetByIdAsync(userId)).ReturnsAsync(existingUser);
+            _mockRepo.Setup(repo => repo.UpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
 
             // Act
             var result = await _controller.UpdateUser(userId, updatedUser);
@@ -127,19 +125,17 @@ namespace Project.Tests.Controllers
         [Fact]
         public async Task DeleteUser_ReturnsNoContent_WhenSuccessful()
         {
+            // Arrange
             var userId = Guid.NewGuid();
-            var user = new Project.Api.Models.User
-            {
-                Id = userId,
-                Name = "Sneha",
-                Email = "sneha@example.com",
-            };
+            var user = new User { Id = userId, Name = "Sneha" };
 
-            _mockSvc.Setup(s => s.GetUserByIdAsync(userId)).ReturnsAsync(user);
-            _mockSvc.Setup(s => s.DeleteUserAsync(userId)).ReturnsAsync(true);
+            _mockRepo.Setup(repo => repo.GetByIdAsync(userId)).ReturnsAsync(user);
+            _mockRepo.Setup(repo => repo.DeleteAsync(userId)).Returns(Task.CompletedTask);
 
+            // Act
             var result = await _controller.DeleteUser(userId);
 
+            // Assert
             Assert.IsType<NoContentResult>(result);
         }
 
@@ -148,7 +144,7 @@ namespace Project.Tests.Controllers
         {
             // Arrange
             var userId = Guid.NewGuid();
-            _mockSvc.Setup(s => s.DeleteUserAsync(userId)).ReturnsAsync(false);
+            _mockRepo.Setup(repo => repo.GetByIdAsync(userId)).ReturnsAsync((User?)null);
 
             // Act
             var result = await _controller.DeleteUser(userId);
