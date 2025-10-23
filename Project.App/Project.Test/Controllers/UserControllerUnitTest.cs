@@ -127,14 +127,19 @@ namespace Project.Tests.Controllers
         [Fact]
         public async Task DeleteUser_ReturnsNoContent_WhenSuccessful()
         {
-            // Arrange
             var userId = Guid.NewGuid();
+            var user = new Project.Api.Models.User
+            {
+                Id = userId,
+                Name = "Sneha",
+                Email = "sneha@example.com",
+            };
+
+            _mockSvc.Setup(s => s.GetUserByIdAsync(userId)).ReturnsAsync(user);
             _mockSvc.Setup(s => s.DeleteUserAsync(userId)).ReturnsAsync(true);
 
-            // Act
             var result = await _controller.DeleteUser(userId);
 
-            // Assert
             Assert.IsType<NoContentResult>(result);
         }
 
