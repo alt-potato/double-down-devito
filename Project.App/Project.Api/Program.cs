@@ -1,5 +1,9 @@
+using System.Security.Claims;
+using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.EntityFrameworkCore;
 using Project.Api.Data;
 using Project.Api.Repositories;
@@ -17,27 +21,17 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Load configuration from multiple sources (in order of precedence):
-        // 1. appsettings.json (base configuration)
-        // 2. appsettings.{Environment}.json (environment-specific)
-        // 3. adminsetting.json (optional admin overrides)
-        // 4. Environment variables (highest priority, can override anything)
-        // 5. User secrets (for local development only)
+        // use adminsetting.json as configuration
         builder.Configuration.AddJsonFile(
             "adminsetting.json",
             optional: true,
             reloadOnChange: true
         );
-        builder.Configuration.AddEnvironmentVariables(prefix: "DAUNTING_");
 
-        // Configure Serilog with environment-aware settings
+        // configure Serilog
         Log.Logger = new LoggerConfiguration()
-            .ReadFrom.Configuration(builder.Configuration)
-            .Enrich.FromLogContext()
-            .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName)
-            .WriteTo.Console(
-                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"
-            )
+            .MinimumLevel.Debug()
+            .WriteTo.Console()
             .CreateLogger();
 
         builder.Host.UseSerilog();
@@ -45,23 +39,47 @@ public class Program
         // use extension methods to configure services
         builder.Services.AddDatabase(builder.Configuration);
         builder.Services.AddApplicationServices();
-        builder.Services.AddCorsPolicy(builder.Configuration);
+        builder.Services.AddCorsPolicy();
         builder.Services.AddAuth(builder.Configuration, builder.Environment);
 
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
-        builder.Services.AddHealthChecks();
 
         var app = builder.Build();
 
+        // optional/safe auto-migrate in other words our startup wont crash if the our migration model doenst match the DB
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            try
+            {
+                db.Database.Migrate();
+                Log.Information("[Startup] Database migration check complete.");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(
+                    ex,
+                    "[Startup] Database migration skipped or failed. Continuing startup."
+                );
+            }
+        }
+
         app.UseMiddleware<GlobalExceptionHandler>();
 
-        // Health check endpoint (useful for monitoring and load balancers)
-        app.MapHealthChecks("/health");
+        // connection string print
+        app.MapGet(
+            "/string",
+            () =>
+            {
+                var CS = builder.Configuration.GetConnectionString("DefaultConnection");
+                return Results.Ok(CS);
+            }
+        );
 
-        // Configure the HTTP request pipeline.
+        // is development envrionment
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
@@ -86,10 +104,7 @@ public static class ProgramExtensions
     /// <summary>
     /// Applies the configuration for the CORS policy.
     /// </summary>
-    public static IServiceCollection AddCorsPolicy(
-        this IServiceCollection services,
-        IConfiguration configuration
-    )
+    public static IServiceCollection AddCorsPolicy(this IServiceCollection services)
     {
         services.AddCors(options =>
         {
@@ -97,12 +112,8 @@ public static class ProgramExtensions
                 CorsPolicy,
                 policy =>
                 {
-                    var allowedOrigins =
-                        configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>()
-                        ?? new[] { "http://localhost:3000" };
-
                     policy
-                        .WithOrigins(allowedOrigins) // Read from configuration
+                        .WithOrigins("http://localhost:3000", "https://localhost:3000") // Next.js frontend
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials(); // Required for cookies
@@ -140,7 +151,6 @@ public static class ProgramExtensions
         // singleton services
         services.AddHttpClient<IDeckApiService, DeckApiService>();
         services.AddSingleton<IRoomSSEService, RoomSSEService>();
-        services.AddHostedService<SSEShutdownService>();
 
         // scoped repositories
         services.AddScoped<IHandRepository, HandRepository>();
@@ -163,23 +173,19 @@ public static class ProgramExtensions
         IWebHostEnvironment environment
     )
     {
-        // Validate required OAuth configuration
+        // sanity check for auth errors logging
         if (!environment.IsEnvironment("Testing"))
         {
             var gid = configuration["Google:ClientId"];
             var gsec = configuration["Google:ClientSecret"];
-
-            // Allow environment variables to override config file
-            // e.g., DAUNTING_Google__ClientId, DAUNTING_Google__ClientSecret
             if (string.IsNullOrWhiteSpace(gid) || string.IsNullOrWhiteSpace(gsec))
             {
                 throw new InvalidOperationException(
-                    "Google OAuth config missing. Set Google:ClientId and Google:ClientSecret in "
-                        + "appsettings.json, user secrets, or environment variables (DAUNTING_Google__ClientId, DAUNTING_Google__ClientSecret)."
+                    "Google OAuth config missing. Set Google:ClientId and Google:ClientSecret."
                 );
             }
             Log.Information(
-                "Google OAuth configured. ClientId (first 8): {ClientId}",
+                "Google ClientId (first 8): {ClientId}",
                 gid?.Length >= 8 ? gid[..8] : gid
             );
         }
@@ -191,13 +197,14 @@ public static class ProgramExtensions
                 // where the app reads identity from on each request
                 options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
                 // how the app prompts an unauthenticated user to log in
+                // you can set DefaultChallengeScheme to Cookies instead but it didnt work before
                 options.DefaultChallengeScheme = GoogleDefaults.AuthenticationScheme;
             })
             .AddCookie(cookie =>
             {
                 // cross-site cookie SPA on :3000 to API on :7069
                 cookie.Cookie.SameSite = SameSiteMode.None;
-                // browsers require Secure when SameSite=None this is why we need https instead of http
+                // browsers require Secure when SameSite=None
                 cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 
                 // for APIs return status codes instead of 302 redirects
@@ -217,71 +224,93 @@ public static class ProgramExtensions
             })
             .AddGoogle(options =>
             {
-                options.ClientId = configuration["Google:ClientId"]!; //  from secrets / config
-                options.ClientSecret = configuration["Google:ClientSecret"]!; //  from secrets / config
-                options.CallbackPath = "/auth/google/callback"; //  google redirects here after login if we change this we need to change it on google cloud as well!
-                options.Events = new Microsoft.AspNetCore.Authentication.OAuth.OAuthEvents
+                options.ClientId = configuration["Google:ClientId"]!;
+                options.ClientSecret = configuration["Google:ClientSecret"]!;
+                options.CallbackPath = "/auth/google/callback";
+                options.Scope.Add("email");
+                options.Scope.Add("profile");
+
+                // ensure we actually fetch profile claims from Google UserInfo endpoint
+                options.SaveTokens = true;
+                options.UserInformationEndpoint = "https://www.googleapis.com/oauth2/v3/userinfo";
+                options.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
+                options.ClaimActions.MapJsonKey(ClaimTypes.Name, "name");
+                options.ClaimActions.MapJsonKey("picture", "picture");
+                options.ClaimActions.MapJsonKey("email_verified", "email_verified");
+
+                // Upsert user into DB when Google signs in successfully
+                options.Events = new OAuthEvents
                 {
                     OnCreatingTicket = async ctx =>
                     {
-                        var logger = ctx.HttpContext.RequestServices.GetRequiredService<
+                        var log = ctx.HttpContext.RequestServices.GetRequiredService<
                             ILogger<Program>
                         >();
-                        logger.LogInformation(
-                            "[OAuth] OnCreatingTicket fired - processing Google login"
+
+                        // fetch the full user JSON from Google's userinfo endpoint
+                        var request = new System.Net.Http.HttpRequestMessage(
+                            System.Net.Http.HttpMethod.Get,
+                            ctx.Options.UserInformationEndpoint
                         );
+                        request.Headers.Authorization =
+                            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                                "Bearer",
+                                ctx.AccessToken
+                            );
+
+                        var response = await ctx.Backchannel.SendAsync(request);
+                        response.EnsureSuccessStatusCode();
+
+                        using var userJson = JsonDocument.Parse(
+                            await response.Content.ReadAsStringAsync()
+                        );
+                        var j = userJson.RootElement;
+
+                        var email = j.TryGetProperty("email", out var e) ? e.GetString() : null;
+                        var verified =
+                            j.TryGetProperty("email_verified", out var v) && v.GetBoolean();
+                        var name = j.TryGetProperty("name", out var n) ? n.GetString() : null;
+                        var picture = j.TryGetProperty("picture", out var p) ? p.GetString() : null;
+
+                        log.LogInformation(
+                            "[OAuth] CreatingTicket: email={Email}, verified={Verified}, name={Name}",
+                            email,
+                            verified,
+                            name
+                        );
+
+                        if (string.IsNullOrWhiteSpace(email) || !verified)
+                        {
+                            log.LogWarning("[OAuth] Missing or unverified email; failing ticket.");
+                            ctx.Fail("Google email must be present and verified.");
+                            return;
+                        }
 
                         try
                         {
-                            var email = ctx.User.GetProperty("email").GetString();
-                            var verified =
-                                ctx.User.TryGetProperty("email_verified", out var ev)
-                                && ev.GetBoolean();
-                            var name = ctx.User.TryGetProperty("name", out var n)
-                                ? n.GetString()
-                                : null;
-                            var picture = ctx.User.TryGetProperty("picture", out var p)
-                                ? p.GetString()
-                                : null;
+                            using var scope = ctx.HttpContext.RequestServices.CreateScope();
+                            var users = scope.ServiceProvider.GetRequiredService<IUserService>();
 
-                            logger.LogInformation(
-                                "[OAuth] Email: {Email}, Verified: {Verified}, Name: {Name}",
-                                email,
-                                verified,
-                                name
+                            var user = await users.UpsertGoogleUserByEmailAsync(
+                                email!,
+                                name,
+                                picture
                             );
 
-                            if (string.IsNullOrWhiteSpace(email) || !verified)
-                            {
-                                logger.LogWarning(
-                                    "[OAuth] Email validation failed - Email: {Email}, Verified: {Verified}",
-                                    email,
-                                    verified
-                                );
-                                ctx.Fail("Google email must be present and verified.");
-                                return;
-                            }
-
-                            var svc =
-                                ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
-                            logger.LogInformation(
-                                "[OAuth] Calling UpsertGoogleUserByEmailAsync for {Email}",
-                                email
-                            );
-                            await svc.UpsertGoogleUserByEmailAsync(email, name, picture);
-                            logger.LogInformation(
-                                "[OAuth] Successfully upserted user for {Email}",
-                                email
+                            log.LogInformation(
+                                "[OAuth] Upsert complete: UserId={UserId}, Email={UserEmail}",
+                                user.Id,
+                                user.Email
                             );
                         }
                         catch (Exception ex)
                         {
-                            logger.LogError(
+                            log.LogError(
                                 ex,
-                                "[OAuth] Error in OnCreatingTicket: {Message}",
-                                ex.Message
+                                "[OAuth] Error during UpsertGoogleUserByEmailAsync for {Email}",
+                                email
                             );
-                            throw;
+                            ctx.Fail("Internal error during user creation.");
                         }
                     },
                 };
