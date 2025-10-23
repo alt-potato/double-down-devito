@@ -1,20 +1,16 @@
 using System.Security.Claims;
-using System.Text;
 using System.Text.Json;
-using AutoMapper;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.OAuth;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Project.Api.Data;
-using Project.Api.Middleware;
 using Project.Api.Repositories;
 using Project.Api.Repositories.Interface;
 using Project.Api.Services;
 using Project.Api.Services.Interface;
+using Project.Api.Utilities.Middleware;
 using Serilog;
 
 namespace Project.Api;
@@ -25,30 +21,14 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        const string CorsPolicy = "FrontendCors";
-
-        builder.Services.AddCors(options =>
-        {
-            options.AddPolicy(
-                CorsPolicy,
-                policy =>
-                {
-                    policy
-                        .WithOrigins("http://localhost:3000", "https://localhost:3000") //  Next.js dev origin add other frontend origins below this when we move to server
-                        .AllowAnyHeader()
-                        // .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                        .AllowAnyMethod() // allow PUT/PATCH/DELETE/etc for preflight
-                        .AllowCredentials(); // required cookie for auth
-                }
-            );
-        });
-
+        // use adminsetting.json as configuration
         builder.Configuration.AddJsonFile(
             "adminsetting.json",
             optional: true,
             reloadOnChange: true
         );
 
+        // configure Serilog
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Console()
@@ -56,51 +36,148 @@ public class Program
 
         builder.Host.UseSerilog();
 
+        // use extension methods to configure services
+        builder.Services.AddDatabase(builder.Configuration);
+        builder.Services.AddApplicationServices();
+        builder.Services.AddCorsPolicy();
+        builder.Services.AddAuth(builder.Configuration, builder.Environment);
+
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
 
-        builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
+        var app = builder.Build();
+
+        // optional/safe auto-migrate in other words our startup wont crash if the our migration model doenst match the DB
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            try
+            {
+                db.Database.Migrate();
+                Log.Information("[Startup] Database migration check complete.");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(
+                    ex,
+                    "[Startup] Database migration skipped or failed. Continuing startup."
+                );
+            }
+        }
+
+        app.UseMiddleware<GlobalExceptionHandler>();
+
+        // connection string print
+        app.MapGet(
+            "/string",
+            () =>
+            {
+                var CS = builder.Configuration.GetConnectionString("DefaultConnection");
+                return Results.Ok(CS);
+            }
         );
 
-        //do not delete me 3:<
-        builder.Services.AddScoped<IUserRepository, UserRepository>();
-        builder.Services.AddScoped<IUserService, UserService>();
-
-        builder.Services.AddScoped<IHandService, HandService>();
-
-        builder.Services.AddScoped<IHandRepository, HandRepository>();
-
-        builder.Services.AddSingleton<IRoomSSEService, RoomSSEService>();
-
-        //Auto Mapper
-        builder.Services.AddAutoMapper(typeof(Program));
-
-        // CORS configuration
-        // the code below was redundant so I think this caused the errors earlier just leaving it commented in case it was important
-        /*
-        builder.Services.AddCors(options =>
+        // is development envrionment
+        if (app.Environment.IsDevelopment())
         {
-            options.AddDefaultPolicy(policy =>
-            {
-                policy
-                    .WithOrigins("http://localhost:3000") // Your Next.js frontend
-                    .AllowAnyHeader()
-                    .AllowAnyMethod()
-                    .AllowCredentials(); // Required for cookies
-            });
+            app.MapOpenApi();
+            app.UseSwagger();
+            app.UseSwaggerUI();
+        }
+
+        app.UseCors(ProgramExtensions.CorsPolicy); // Enable CORS with our policy
+        app.UseHttpsRedirection();
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.MapControllers();
+
+        app.Run();
+    }
+}
+
+public static class ProgramExtensions
+{
+    public const string CorsPolicy = "FrontendCors";
+
+    /// <summary>
+    /// Applies the configuration for the CORS policy.
+    /// </summary>
+    public static IServiceCollection AddCorsPolicy(this IServiceCollection services)
+    {
+        services.AddCors(options =>
+        {
+            options.AddPolicy(
+                CorsPolicy,
+                policy =>
+                {
+                    policy
+                        .WithOrigins("http://localhost:3000", "https://localhost:3000") // Next.js frontend
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials(); // Required for cookies
+                }
+            );
         });
-        */
+        return services;
+    }
 
-        builder.Services.AddAuthorization();
+    /// <summary>
+    /// Registers the database.
+    /// </summary>
+    public static IServiceCollection AddDatabase(
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
+    {
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
+        );
+        return services;
+    }
 
+    /// <summary>
+    /// Registers the services and repositories used by the application.
+    /// </summary>
+    public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+    {
+        // scoped services
+        services.AddScoped<IBlackjackService, BlackjackService>();
+        services.AddScoped<IHandService, HandService>();
+        services.AddScoped<IRoomService, RoomService>();
+        services.AddScoped<IUserService, UserService>();
+
+        // singleton services
+        services.AddHttpClient<IDeckApiService, DeckApiService>();
+        services.AddSingleton<IRoomSSEService, RoomSSEService>();
+
+        // scoped repositories
+        services.AddScoped<IHandRepository, HandRepository>();
+        services.AddScoped<IRoomPlayerRepository, RoomPlayerRepository>();
+        services.AddScoped<IRoomRepository, RoomRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
+
+        // automapper!!!
+        services.AddAutoMapper(typeof(Program));
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures and registers the authentication services.
+    /// </summary>
+    public static IServiceCollection AddAuth(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IWebHostEnvironment environment
+    )
+    {
         // sanity check for auth errors logging
-        if (!builder.Environment.IsEnvironment("Testing"))
+        if (!environment.IsEnvironment("Testing"))
         {
-            var gid = builder.Configuration["Google:ClientId"];
-            var gsec = builder.Configuration["Google:ClientSecret"];
+            var gid = configuration["Google:ClientId"];
+            var gsec = configuration["Google:ClientSecret"];
             if (string.IsNullOrWhiteSpace(gid) || string.IsNullOrWhiteSpace(gsec))
             {
                 throw new InvalidOperationException(
@@ -113,17 +190,21 @@ public class Program
             );
         }
 
-        builder
-            .Services.AddAuthentication(options =>
+        // Google OAuth
+        services
+            .AddAuthentication(options =>
             {
-                options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme; // where the app reads identity from on each request
-                options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme; //  changed from Google to Cookie so failed auth returns 401 instead of redirecting to Google
+                // where the app reads identity from on each request
+                options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                // how the app prompts an unauthenticated user to log in
+                // you can set DefaultChallengeScheme to Cookies instead but it didnt work before
+                options.DefaultChallengeScheme = GoogleDefaults.AuthenticationScheme;
             })
             .AddCookie(cookie =>
             {
                 // cross-site cookie SPA on :3000 to API on :7069
                 cookie.Cookie.SameSite = SameSiteMode.None;
-                // browsers require Secure when SameSite=None this is why we need https instead of http
+                // browsers require Secure when SameSite=None
                 cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 
                 // for APIs return status codes instead of 302 redirects
@@ -143,9 +224,9 @@ public class Program
             })
             .AddGoogle(options =>
             {
-                options.ClientId = builder.Configuration["Google:ClientId"]!; //  from secrets / config
-                options.ClientSecret = builder.Configuration["Google:ClientSecret"]!; //  from secrets / config
-                options.CallbackPath = "/auth/google/callback"; //  google redirects here after login if we change this we need to change it on google cloud as well!
+                options.ClientId = configuration["Google:ClientId"]!;
+                options.ClientSecret = configuration["Google:ClientSecret"]!;
+                options.CallbackPath = "/auth/google/callback";
                 options.Scope.Add("email");
                 options.Scope.Add("profile");
 
@@ -157,7 +238,7 @@ public class Program
                 options.ClaimActions.MapJsonKey("picture", "picture");
                 options.ClaimActions.MapJsonKey("email_verified", "email_verified");
 
-                // this allows migrations, upsert user into our DB when Google signs in successfully
+                // Upsert user into DB when Google signs in successfully
                 options.Events = new OAuthEvents
                 {
                     OnCreatingTicket = async ctx =>
@@ -166,7 +247,7 @@ public class Program
                             ILogger<Program>
                         >();
 
-                        // ---- fetch the full user JSON from Google's userinfo endpoint ----
+                        // fetch the full user JSON from Google's userinfo endpoint
                         var request = new System.Net.Http.HttpRequestMessage(
                             System.Net.Http.HttpMethod.Get,
                             ctx.Options.UserInformationEndpoint
@@ -207,7 +288,6 @@ public class Program
 
                         try
                         {
-                            // Ensure DB is accessible even if a migration was recently applied
                             using var scope = ctx.HttpContext.RequestServices.CreateScope();
                             var users = scope.ServiceProvider.GetRequiredService<IUserService>();
 
@@ -236,52 +316,8 @@ public class Program
                 };
             });
 
-        var app = builder.Build();
+        services.AddAuthorization();
 
-        using (var scope = app.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            try
-            {
-                db.Database.Migrate();
-                Log.Information("[Startup] Database migration check complete.");
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(
-                    ex,
-                    "[Startup] Database migration skipped or failed. Continuing startup."
-                );
-            }
-        }
-
-        // Re-ordered to ensure CORS headers are applied to preflight (OPTIONS) before anything can short-circuit
-        app.UseHttpsRedirection();
-        app.UseCors(CorsPolicy); // Enable CORS with our policy
-
-        app.UseMiddleware<GlobalExceptionHandler>();
-
-        app.MapGet(
-            "/string",
-            () =>
-            {
-                var CS = builder.Configuration.GetConnectionString("DefaultConnection");
-                return Results.Ok(CS);
-            }
-        );
-
-        // Configure the HTTP request pipeline.
-        if (app.Environment.IsDevelopment())
-        {
-            app.MapOpenApi();
-            app.UseSwagger();
-            app.UseSwaggerUI();
-        }
-
-        app.UseAuthentication();
-        app.UseAuthorization();
-        app.MapControllers();
-
-        app.Run();
+        return services;
     }
 }
