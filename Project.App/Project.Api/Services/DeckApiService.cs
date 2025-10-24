@@ -6,9 +6,9 @@ using Project.Api.Utilities;
 
 namespace Project.Api.Services;
 
-public class DeckApiService : IDeckApiService
+public class DeckApiService(HttpClient client) : IDeckApiService
 {
-    private readonly HttpClient _httpClient;
+    private readonly HttpClient _httpClient = client;
 
     private readonly JsonSerializerOptions _jsonSerializerOptions = new()
     {
@@ -17,11 +17,6 @@ public class DeckApiService : IDeckApiService
     };
 
     private const string BASE_API_URL = "https://deckofcardsapi.com/api";
-
-    public DeckApiService(HttpClient client)
-    {
-        _httpClient = client;
-    }
 
     /// <summary>
     /// Create a new shuffled deck and return the deck ID.
@@ -77,7 +72,7 @@ public class DeckApiService : IDeckApiService
     /// Player draws specified number of cards, count, from specified deck.
     /// Draws one card by default.
     /// </summary>
-    /// <returns>true if successful</returns>
+    /// <returns>the cards drawn</returns>
     public async Task<List<CardDTO>> DrawCards(string deckId, long handId, int count = 1)
     {
         return await DrawCards(deckId, handId.ToString(), count);
@@ -87,7 +82,7 @@ public class DeckApiService : IDeckApiService
     /// Player draws specified number of cards, count, from specified deck.
     /// Draws one card by default.
     /// </summary>
-    /// <returns>true if successful</returns>
+    /// <returns>the list of cards drawn</returns>
     public async Task<List<CardDTO>> DrawCards(string deckId, string handName, int count = 1)
     {
         // enforce non-negative count
@@ -107,8 +102,8 @@ public class DeckApiService : IDeckApiService
 
         if (drawData?.Cards is null || drawData.Cards.Count == 0)
         {
-            // shouldn't happen, but if it does, return the current hand
-            return await ListHand(deckId, handName);
+            // shouldn't happen, but if it does, return empty list
+            return [];
         }
 
         // get card codes (as csv string)
@@ -118,17 +113,17 @@ public class DeckApiService : IDeckApiService
         // add cards to the player’s hand
         await AddToHand(deckId, handName, cardsToAdd);
 
-        // return contents of hand
-        return await ListHand(deckId, handName);
+        // return only newly drawn cards
+        return drawData.Cards;
     }
 
     /// <summary>
     /// Return all cards from all piles back to the main deck.
     /// </summary>
     /// <returns>true if successful</returns>
-    public async Task<bool> ReturnAllCardsToDeck(string deckId)
+    public async Task<bool> ReturnAllCardsToDeck(string deckId, bool shuffle = true)
     {
-        string url = $"{BASE_API_URL}/deck/{deckId}/return/";
+        string url = $"{BASE_API_URL}/deck/{deckId}/{(shuffle ? "shuffle" : "return")}/";
 
         var response = await _httpClient.GetAsync(url);
         if (!response.IsSuccessStatusCode)
@@ -139,10 +134,10 @@ public class DeckApiService : IDeckApiService
     }
 
     /// <summary>
-    /// Calls Api to add card to specified hand. If hand does not exist, will create a hand with give handName.
+    /// Calls Api to add card to specified hand. If hand does not exist, will create a hand with the given handName.
     /// </summary>
     /// <returns>true if successful</returns>
-    private async Task<bool> AddToHand(string deckId, string handName, string cardCodes)
+    public async Task<bool> AddToHand(string deckId, string handName, string cardCodes)
     {
         string addToPileUrl =
             $"{BASE_API_URL}/deck/{deckId}/pile/{handName}/add/?cards={cardCodes}";
@@ -155,10 +150,26 @@ public class DeckApiService : IDeckApiService
     }
 
     /// <summary>
+    /// Calls Api to remove cards from specified hand.
+    /// </summary>
+    /// <returns>true if successful</returns>
+    public async Task<bool> RemoveFromHand(string deckId, string handName, string cardCodes)
+    {
+        string removeFromPileUrl =
+            $"{BASE_API_URL}/deck/{deckId}/pile/{handName}/draw/?cards={cardCodes}";
+        var removeResponse = await _httpClient.GetAsync(removeFromPileUrl);
+        if (!removeResponse.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException("Failed to remove cards from hand.");
+        }
+        return true;
+    }
+
+    /// <summary>
     /// Calls Api to list cards in specified pile from specified deck.
     /// </summary>
     /// <returns>A list of card DTOs</returns>
-    private async Task<List<CardDTO>> ListHand(string deckId, string handName)
+    public async Task<List<CardDTO>> ListHand(string deckId, string handName)
     {
         string listPileUrl = $"{BASE_API_URL}/deck/{deckId}/pile/{handName}/list/";
         var listResponse = await _httpClient.GetAsync(listPileUrl);

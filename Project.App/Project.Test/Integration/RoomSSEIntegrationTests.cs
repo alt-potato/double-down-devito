@@ -1,14 +1,10 @@
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Moq;
 using Project.Api;
 using Project.Api.DTOs;
+using Project.Api.Models.Games;
 using Project.Api.Services;
-using Project.Api.Services.Interface;
 using Project.Test.Helpers;
 
 namespace Project.Test.Integration;
@@ -16,69 +12,26 @@ namespace Project.Test.Integration;
 public class RoomSseIntegrationTests(WebApplicationFactory<Program> factory)
     : IntegrationTestBase(factory)
 {
-    /// <summary>
-    /// Helper to create an HttpClient configured to use a specific IRoomSSEService instance.
-    /// </summary>
-    private HttpClient CreateClientWithMocks(IRoomSSEService sseService)
-    {
-        return CreateTestClient(services =>
-        {
-            services.RemoveAll<IRoomSSEService>();
-            services.AddSingleton(sseService);
-
-            services.AddScoped(_ => Mock.Of<IRoomService>());
-        });
-    }
-
-    /// <summary>
-    /// Helper to open an SSE connection and return the StreamReader.
-    /// </summary>
-    private async Task<(
-        HttpClient client,
-        StreamReader reader,
-        CancellationTokenSource cts
-    )> OpenSseConnection(Guid roomId, IRoomSSEService sseService)
-    {
-        var client = CreateClientWithMocks(sseService);
-        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/room/{roomId}/events");
-        request.Headers.Accept.Clear();
-        request.Headers.Accept.Add(
-            new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("text/event-stream")
-        );
-
-        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-        Assert.Equal("text/event-stream", response.Content.Headers.ContentType!.MediaType);
-
-        var stream = await response.Content.ReadAsStreamAsync();
-        var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
-
-        // Wait a moment so the connection is established and the “: connected” line is sent
-        await Task.Delay(100);
-        string firstLine = await reader.ReadLineAsync() ?? "No line received!";
-        Assert.Equal(": connected", firstLine);
-
-        // Create a CancellationTokenSource to simulate client disconnection later if needed
-        var cts = new CancellationTokenSource();
-        // This is a bit tricky for integration tests, as the actual cancellation token
-        // is tied to the HttpContext.RequestAborted. We can't directly cancel it from here
-        // without disposing the client, which closes the connection.
-        // For explicit disconnection testing, we'll rely on client.Dispose().
-        return (client, reader, cts);
-    }
-
     [Fact]
     public async Task GetRoomEvents_StreamReceivesBroadcastEvents_SingleClient()
     {
         // Arrange
         var sseService = new RoomSSEService();
         var roomId = Guid.NewGuid();
-        var (client, reader, cts) = await OpenSseConnection(roomId, sseService);
+        var client = CreateSSEClientWithMocks(sseService);
+        var (reader, cts) = await client.OpenSseConnection(roomId);
 
         var messageContent = "Hello everyone!";
         var message = new MessageDTO(messageContent);
-        var expectedMessage = $"Anonymous: {messageContent}";
-        var expectedData = JsonSerializer.Serialize(expectedMessage);
+
+        // Update expectedData to serialize a MessageEventData object
+        var expectedMessageEventData = new MessageEventData
+        {
+            Sender = "Anonymous", // Assuming the controller sets this
+            Content = messageContent,
+            // Timestamp will be set by the service, so we can't assert an exact value.
+            // We'll deserialize and check properties instead of direct string comparison.
+        };
 
         // Act: Send a chat message
         var postResponse = await client.PostAsJsonAsync($"/api/room/{roomId}/chat", message);
@@ -89,7 +42,18 @@ public class RoomSseIntegrationTests(WebApplicationFactory<Program> factory)
         Assert.Equal("event: message", eventLine);
 
         string dataLine = await reader.ReadLineAsync() ?? "No line received!";
-        Assert.Equal($"data: {expectedData}", dataLine);
+        Assert.StartsWith("data: ", dataLine); // Check prefix
+
+        // Deserialize the actual data received
+        var receivedDataJson = dataLine.Substring("data: ".Length);
+        var receivedMessageEventData = JsonSerializer.Deserialize<MessageEventData>(
+            receivedDataJson
+        );
+
+        Assert.NotNull(receivedMessageEventData);
+        Assert.Equal(expectedMessageEventData.Sender, receivedMessageEventData.Sender);
+        Assert.Equal(expectedMessageEventData.Content, receivedMessageEventData.Content);
+        Assert.NotEqual(default, receivedMessageEventData.Timestamp); // Ensure timestamp was set
 
         string blankLine = await reader.ReadLineAsync() ?? "No line received!";
         Assert.True(string.IsNullOrEmpty(blankLine));
@@ -107,13 +71,20 @@ public class RoomSseIntegrationTests(WebApplicationFactory<Program> factory)
         var roomId = Guid.NewGuid();
 
         // Open two connections to the same room
-        var (client1, reader1, cts1) = await OpenSseConnection(roomId, sseService);
-        var (client2, reader2, cts2) = await OpenSseConnection(roomId, sseService);
+        var client1 = CreateSSEClientWithMocks(sseService);
+        var (reader1, cts1) = await client1.OpenSseConnection(roomId);
+        var client2 = CreateSSEClientWithMocks(sseService);
+        var (reader2, cts2) = await client2.OpenSseConnection(roomId);
 
         var messageContent = "Group chat!";
         var message = new MessageDTO(messageContent);
-        var expectedMessage = $"Anonymous: {messageContent}";
-        var expectedData = JsonSerializer.Serialize(expectedMessage);
+
+        // Update expectedData to serialize a MessageEventData object
+        var expectedMessageEventData = new MessageEventData
+        {
+            Sender = "Anonymous",
+            Content = messageContent,
+        };
 
         // Act: Send a chat message
         var postResponse = await client1.PostAsJsonAsync($"/api/room/{roomId}/chat", message);
@@ -123,13 +94,25 @@ public class RoomSseIntegrationTests(WebApplicationFactory<Program> factory)
         string eventLine1 = await reader1.ReadLineAsync() ?? "No line received!";
         Assert.Equal("event: message", eventLine1);
         string dataLine1 = await reader1.ReadLineAsync() ?? "No line received!";
-        Assert.Equal($"data: {expectedData}", dataLine1);
+        Assert.StartsWith("data: ", dataLine1);
+        var receivedMessageEventData1 = JsonSerializer.Deserialize<MessageEventData>(
+            dataLine1.Substring("data: ".Length)
+        );
+        Assert.NotNull(receivedMessageEventData1);
+        Assert.Equal(expectedMessageEventData.Sender, receivedMessageEventData1.Sender);
+        Assert.Equal(expectedMessageEventData.Content, receivedMessageEventData1.Content);
         await reader1.ReadLineAsync(); // Blank line
 
         string eventLine2 = await reader2.ReadLineAsync() ?? "No line received!";
         Assert.Equal("event: message", eventLine2);
         string dataLine2 = await reader2.ReadLineAsync() ?? "No line received!";
-        Assert.Equal($"data: {expectedData}", dataLine2);
+        Assert.StartsWith("data: ", dataLine2);
+        var receivedMessageEventData2 = JsonSerializer.Deserialize<MessageEventData>(
+            dataLine2.Substring("data: ".Length)
+        );
+        Assert.NotNull(receivedMessageEventData2);
+        Assert.Equal(expectedMessageEventData.Sender, receivedMessageEventData2.Sender);
+        Assert.Equal(expectedMessageEventData.Content, receivedMessageEventData2.Content);
         await reader2.ReadLineAsync(); // Blank line
 
         // Clean up
@@ -148,13 +131,20 @@ public class RoomSseIntegrationTests(WebApplicationFactory<Program> factory)
         var roomId2 = Guid.NewGuid();
 
         // Open connections to different rooms
-        var (client1, reader1, cts1) = await OpenSseConnection(roomId1, sseService);
-        var (client2, reader2, cts2) = await OpenSseConnection(roomId2, sseService);
+        var client1 = CreateSSEClientWithMocks(sseService);
+        var (reader1, cts1) = await client1.OpenSseConnection(roomId1);
+        var client2 = CreateSSEClientWithMocks(sseService);
+        var (reader2, cts2) = await client2.OpenSseConnection(roomId2);
 
         var messageContent = "Only for room 1!";
         var message = new MessageDTO(messageContent);
-        var expectedMessage = $"Anonymous: {messageContent}";
-        var expectedData = JsonSerializer.Serialize(expectedMessage);
+
+        // Update expectedData to serialize a MessageEventData object
+        var expectedMessageEventData = new MessageEventData
+        {
+            Sender = "Anonymous",
+            Content = messageContent,
+        };
 
         // Act: Send a chat message to room 1
         var postResponse = await client1.PostAsJsonAsync($"/api/room/{roomId1}/chat", message);
@@ -164,7 +154,13 @@ public class RoomSseIntegrationTests(WebApplicationFactory<Program> factory)
         string eventLine1 = await reader1.ReadLineAsync() ?? "No line received!";
         Assert.Equal("event: message", eventLine1);
         string dataLine1 = await reader1.ReadLineAsync() ?? "No line received!";
-        Assert.Equal($"data: {expectedData}", dataLine1);
+        Assert.StartsWith("data: ", dataLine1);
+        var receivedMessageEventData1 = JsonSerializer.Deserialize<MessageEventData>(
+            dataLine1.Substring("data: ".Length)
+        );
+        Assert.NotNull(receivedMessageEventData1);
+        Assert.Equal(expectedMessageEventData.Sender, receivedMessageEventData1.Sender);
+        Assert.Equal(expectedMessageEventData.Content, receivedMessageEventData1.Content);
         await reader1.ReadLineAsync(); // Blank line
 
         // Assert: Client in room 2 does NOT receive the event.
@@ -195,7 +191,7 @@ public class RoomSseIntegrationTests(WebApplicationFactory<Program> factory)
     {
         // Arrange
         var sseService = new RoomSSEService();
-        var client = CreateClientWithMocks(sseService);
+        var client = CreateSSEClientWithMocks(sseService);
         var roomId = Guid.NewGuid();
 
         var request = new HttpRequestMessage(HttpMethod.Get, $"/api/room/{roomId}/events");
@@ -228,7 +224,7 @@ public class RoomSseIntegrationTests(WebApplicationFactory<Program> factory)
     {
         // Arrange
         var sseService = new RoomSSEService();
-        var client = CreateClientWithMocks(sseService);
+        var client = CreateSSEClientWithMocks(sseService);
         var roomId = Guid.NewGuid();
         var message = new MessageDTO(content!);
 
@@ -252,7 +248,8 @@ public class RoomSseIntegrationTests(WebApplicationFactory<Program> factory)
         var roomId = Guid.NewGuid();
 
         // Open a connection
-        var (client, reader, cts) = await OpenSseConnection(roomId, sseService);
+        var client = CreateSSEClientWithMocks(sseService);
+        var (reader, cts) = await client.OpenSseConnection(roomId);
 
         // Act: Simulate client disconnection by disposing the HttpClient
         client.Dispose();
@@ -263,7 +260,7 @@ public class RoomSseIntegrationTests(WebApplicationFactory<Program> factory)
         // Act: Try to broadcast an event to the room
         var messageContent = "Should not be received by disconnected client.";
         var message = new MessageDTO(messageContent);
-        var postResponse = await CreateClientWithMocks(sseService)
+        var postResponse = await CreateSSEClientWithMocks(sseService)
             .PostAsJsonAsync($"/api/room/{roomId}/chat", message);
         postResponse.EnsureSuccessStatusCode();
 

@@ -4,7 +4,8 @@ namespace Project.Api.Models.Games;
 
 public record BlackjackState : GameState<BlackjackStage>
 {
-    public List<object> DealerHand { get; set; } = [];
+    public string DealerHand { get; set; } = "";
+    public Dictionary<Guid, long> Bets { get; set; } = [];
 }
 
 [JsonDerivedType(typeof(BlackjackInitStage), typeDiscriminator: "init")]
@@ -31,11 +32,36 @@ public record BlackjackBettingStage(DateTimeOffset Deadline, Dictionary<Guid, lo
 public record BlackjackDealingStage : BlackjackStage;
 
 // player turn
-// TODO: figure out how turn order will work
-public record BlackjackPlayerActionStage(DateTimeOffset Deadline, int Index) : BlackjackStage;
+public record BlackjackPlayerActionStage(DateTimeOffset Deadline, int PlayerIndex, int HandIndex)
+    : BlackjackStage;
 
 // dealer turn and distribute winnings
 public record BlackjackFinishRoundStage : BlackjackStage;
 
 // teardown, close room
 public record BlackjackTeardownStage : BlackjackStage;
+
+public static class BlackjackStateExtensions
+{
+    /// <summary>
+    /// Resets the deadline of a betting stage to the current time plus the given duration.
+    /// </summary>
+    public static BlackjackBettingStage ResetDeadline(
+        this BlackjackBettingStage stage,
+        TimeSpan duration
+    )
+    {
+        return stage with { Deadline = DateTimeOffset.UtcNow + duration };
+    }
+
+    /// <summary>
+    /// Resets the deadline of a player action stage to the current time plus the given duration.
+    /// </summary>
+    public static BlackjackPlayerActionStage ResetDeadline(
+        this BlackjackPlayerActionStage stage,
+        TimeSpan duration
+    )
+    {
+        return stage with { Deadline = DateTimeOffset.UtcNow + duration };
+    }
+}

@@ -17,11 +17,11 @@ public class Room
 
     public bool IsActive { get; set; }
 
-    public DateTime CreatedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 
-    public DateTime? StartedAt { get; set; }
+    public DateTimeOffset? StartedAt { get; set; }
 
-    public DateTime? EndedAt { get; set; }
+    public DateTimeOffset? EndedAt { get; set; }
 
     [MaxLength(50)]
     public required string GameMode { get; set; }
