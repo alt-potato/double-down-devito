@@ -29,6 +29,9 @@ public class Program
             reloadOnChange: true
         );
 
+        // env files should override adminsettings.json
+        builder.Configuration.AddEnvironmentVariables();
+
         // configure Serilog
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
@@ -235,7 +238,7 @@ public static class ProgramExtensions
                         >();
 
                         // fetch the full user JSON from Google's userinfo endpoint
-                        var request = new System.Net.Http.HttpRequestMessage(
+                        var request = new HttpRequestMessage(
                             System.Net.Http.HttpMethod.Get,
                             ctx.Options.UserInformationEndpoint
                         );
