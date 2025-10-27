@@ -52,10 +52,10 @@ public class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
 
-        if (File.Exists(".env.development"))
-        {
-            DotNetEnv.Env.Load(".env.development");
-        }
+        // if (File.Exists(".env.development"))
+        // {
+        //     DotNetEnv.Env.Load(".env.development");
+        // }
 
         var app = builder.Build();
 
@@ -72,18 +72,18 @@ public class Program
 
         app.UseMiddleware<GlobalExceptionHandler>();
 
-        var port = Environment.GetEnvironmentVariable("PORT") ?? "80";
-        var httpsPort = 7069;
+        // var port = Environment.GetEnvironmentVariable("PORT") ?? "80";
+        // var httpsPort = 7069;
 
-        if (!File.Exists(".env.development"))
-        {
-            app.Urls.Add($"http://*:{port}");
-        }
-        else
-        {
-            app.Urls.Add($"http://localhost:{port}");
-            app.Urls.Add($"https://localhost:{httpsPort}");
-        }
+        // if (!File.Exists(".env.development"))
+        // {
+        //     app.Urls.Add($"http://*:{port}");
+        // }
+        // else
+        // {
+        //     app.Urls.Add($"http://localhost:{port}");
+        //     app.Urls.Add($"https://localhost:{httpsPort}");
+        // }
 
         app.MapGet(
             "/string",
