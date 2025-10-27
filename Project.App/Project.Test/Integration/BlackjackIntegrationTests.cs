@@ -116,7 +116,6 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
         var dbName = $"InMemoryDb_{Guid.NewGuid()}";
 
         var appFactory = CreateConfiguredWebAppFactory(
-            dbName,
             services =>
             {
                 // Replace IRoomSSEService with test instance
@@ -126,7 +125,8 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
                 // Replace IDeckApiService with mock
                 services.RemoveAll<IDeckApiService>();
                 services.AddSingleton(mockDeckService.Object);
-            }
+            },
+            dbName
         );
 
         // --- CREATING A ROOM ---
@@ -688,7 +688,6 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
         var dbName = $"InMemoryDb_{Guid.NewGuid()}";
 
         var appFactory = CreateConfiguredWebAppFactory(
-            dbName,
             services =>
             {
                 // Replace IRoomSSEService with test instance
@@ -698,7 +697,8 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
                 // Replace IDeckApiService with mock
                 services.RemoveAll<IDeckApiService>();
                 services.AddSingleton<IDeckApiService>(mockDeckService.Object);
-            }
+            },
+            dbName
         );
 
         // --- CREATING A ROOM ---
