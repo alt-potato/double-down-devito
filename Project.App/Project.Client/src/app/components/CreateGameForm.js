@@ -47,9 +47,9 @@ export default function CreateGameForm({ userId, onRoomCreated }) {
       // Create initial game state for Blackjack
       const initialGameState = JSON.stringify({
         currentStage: {
-          $type: 'init'
+          $type: 'init',
         },
-        dealerHand: []
+        dealerHand: [],
       });
 
       // Create game config with BlackjackConfig structure
@@ -57,7 +57,7 @@ export default function CreateGameForm({ userId, onRoomCreated }) {
         startingBalance: startingBalanceValue,
         minBet: minBetValue,
         bettingTimeLimit: '00:01:00', // 1 minute
-        turnTimeLimit: '00:00:30' // 30 seconds
+        turnTimeLimit: '00:00:30', // 30 seconds
       });
 
       const response = await fetch(`${API_URL}/api/room`, {
@@ -110,9 +110,7 @@ export default function CreateGameForm({ userId, onRoomCreated }) {
         Create New Game
       </h2>
       {formError && (
-        <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm">
-          {formError}
-        </div>
+        <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm">{formError}</div>
       )}
       <div className="mb-4">
         <label className="block text-yellow-100 mb-1 font-semibold">Room Description (max 500 chars)</label>

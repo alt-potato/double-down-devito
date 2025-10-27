@@ -1,6 +1,14 @@
 'use client';
 
-export default function AddCreditsModal({ isOpen, onClose, balance, creditsToAdd, setCreditsToAdd, onSubmit, isLoading }) {
+export default function AddCreditsModal({
+  isOpen,
+  onClose,
+  balance,
+  creditsToAdd,
+  setCreditsToAdd,
+  onSubmit,
+  isLoading,
+}) {
   if (!isOpen) return null;
 
   return (

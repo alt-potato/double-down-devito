@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import AddCreditsModal from '../../components/AddCreditsModal';
 
-export default function PlayerClient({ _id, initialBalance }) {
+export default function PlayerClient({ _id, _initialBalance }) {
   const router = useRouter();
   const [playerName, setPlayerName] = useState('Danny Devito');
   const [playerId, setPlayerId] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('https://www.shutterstock.com/editorial/image-editorial/NeTeY724MeD5Q1weMTgxMw==/danny-devito-440nw-5624612ab.jpg');
+  const [avatarUrl, setAvatarUrl] = useState(
+    'https://www.shutterstock.com/editorial/image-editorial/NeTeY724MeD5Q1weMTgxMw==/danny-devito-440nw-5624612ab.jpg',
+  );
   const [balance, setBalance] = useState(2089234500);
   const [showModal, setShowModal] = useState(false);
   const [creditsToAdd, setCreditsToAdd] = useState(0);
@@ -60,7 +62,7 @@ export default function PlayerClient({ _id, initialBalance }) {
       alert('Please enter a valid amount greater than 0');
       return;
     }
-    
+
     const newBalance = balance + amount;
 
     setIsLoading(true);
@@ -105,10 +107,10 @@ export default function PlayerClient({ _id, initialBalance }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 p-8 relative overflow-hidden flex items-center justify-center">
       <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto">
-        <Image 
+        <Image
           src={avatarUrl}
-          alt="Description of my image" 
-          width={128} 
+          alt="Description of my image"
+          width={128}
           height={128}
           className="w-32 h-32 mb-4 rounded-full overflow-hidden border-4 border-yellow-600 shadow-lg"
         />
@@ -122,7 +124,7 @@ export default function PlayerClient({ _id, initialBalance }) {
           ) : (
             <p className="text-3xl font-bold text-yellow-400">{balance ?? 0}</p>
           )}
-            <p className="text-3xl font-bold text-yellow-400">Devito Bucks</p>
+          <p className="text-3xl font-bold text-yellow-400">Devito Bucks</p>
         </div>
         {/* Add Credits Button */}
         <button

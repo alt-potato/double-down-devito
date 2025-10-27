@@ -30,7 +30,10 @@ export default function GameClient({ roomId }) {
         const playersData = await playersRes.json();
         console.log('[GameClient] Players fetched:', playersData);
         console.log('[GameClient] Player count:', playersData.length);
-        console.log('[GameClient] Player balances:', playersData.map(p => ({ id: p.userId, balance: p.balance })));
+        console.log(
+          '[GameClient] Player balances:',
+          playersData.map((p) => ({ id: p.userId, balance: p.balance })),
+        );
         setRoomPlayers(playersData);
       }
     } catch (e) {
@@ -209,15 +212,12 @@ export default function GameClient({ roomId }) {
 
     try {
       console.log(`[PlayerAction] Performing action: ${action}`, data);
-      const response = await fetch(
-        `${API_URL}/api/room/${roomId}/player/${user.id}/action`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ action, data }),
-        }
-      );
+      const response = await fetch(`${API_URL}/api/room/${roomId}/player/${user.id}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action, data }),
+      });
 
       if (!response.ok) {
         const error = await response.json();
@@ -331,19 +331,17 @@ export default function GameClient({ roomId }) {
       <div className="bg-black/80 border-2 border-yellow-600 rounded-xl p-4 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-yellow-400">
-              {room?.description || 'Blackjack Table'}
-            </h1>
-            <p className="text-yellow-100/60 text-sm font-mono">
-              Room ID: {roomId.substring(0, 8)}...
-            </p>
+            <h1 className="text-2xl md:text-3xl font-bold text-yellow-400">{room?.description || 'Blackjack Table'}</h1>
+            <p className="text-yellow-100/60 text-sm font-mono">Room ID: {roomId.substring(0, 8)}...</p>
           </div>
           <div className="flex items-center gap-4">
-            <div className={`px-3 py-1 rounded text-sm font-semibold ${
-              room?.isActive
-                ? 'bg-green-600/20 text-green-300 border border-green-600'
-                : 'bg-gray-600/20 text-gray-300 border border-gray-600'
-            }`}>
+            <div
+              className={`px-3 py-1 rounded text-sm font-semibold ${
+                room?.isActive
+                  ? 'bg-green-600/20 text-green-300 border border-green-600'
+                  : 'bg-gray-600/20 text-gray-300 border border-gray-600'
+              }`}
+            >
               {room?.isActive ? 'Active' : 'Waiting'}
             </div>
             <button
@@ -379,9 +377,7 @@ export default function GameClient({ roomId }) {
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
                     <span className="text-yellow-100/60">Starting Balance:</span>
-                    <span className="text-yellow-200 ml-2 font-bold">
-                      ${gameConfig.startingBalance}
-                    </span>
+                    <span className="text-yellow-200 ml-2 font-bold">${gameConfig.startingBalance}</span>
                   </div>
                   <div>
                     <span className="text-yellow-100/60">Min Bet:</span>
@@ -404,9 +400,7 @@ export default function GameClient({ roomId }) {
             {/* Waiting for Host to Start */}
             {!isHost && gameNotStarted && (
               <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 text-center">
-                <p className="text-blue-300">
-                  Waiting for host to start the game...
-                </p>
+                <p className="text-blue-300">Waiting for host to start the game...</p>
               </div>
             )}
           </div>
@@ -419,12 +413,12 @@ export default function GameClient({ roomId }) {
               {currentStage === 'betting' && (
                 <div className="space-y-4">
                   {/* Player Balance */}
-                  {roomPlayers.find(p => p.userId === user?.id) && (
+                  {roomPlayers.find((p) => p.userId === user?.id) && (
                     <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3">
                       <div className="flex justify-between items-center">
                         <span className="text-yellow-100/80">Your Balance:</span>
                         <span className="text-yellow-400 font-bold text-xl">
-                          ${roomPlayers.find(p => p.userId === user?.id)?.balance || 0}
+                          ${roomPlayers.find((p) => p.userId === user?.id)?.balance || 0}
                         </span>
                       </div>
                     </div>
@@ -450,7 +444,7 @@ export default function GameClient({ roomId }) {
                       onChange={(e) => setBetAmount(parseInt(e.target.value))}
                       min={gameConfig?.minBet || 10}
                       step="10"
-                      max={roomPlayers.find(p => p.userId === user?.id)?.balance || 1000}
+                      max={roomPlayers.find((p) => p.userId === user?.id)?.balance || 1000}
                       className="w-full px-4 py-2 rounded bg-black/60 border border-yellow-700 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </div>
@@ -476,7 +470,7 @@ export default function GameClient({ roomId }) {
                       5x
                     </button>
                     <button
-                      onClick={() => setBetAmount(roomPlayers.find(p => p.userId === user?.id)?.balance || 1000)}
+                      onClick={() => setBetAmount(roomPlayers.find((p) => p.userId === user?.id)?.balance || 1000)}
                       className="py-2 px-3 bg-yellow-900/40 hover:bg-yellow-900/60 border border-yellow-700 text-yellow-300 rounded text-sm font-semibold transition"
                     >
                       All In
@@ -497,7 +491,7 @@ export default function GameClient({ roomId }) {
                       <p className="text-green-300 text-sm mb-2 font-semibold">Bets Placed:</p>
                       <div className="space-y-1">
                         {Object.entries(gameState.currentStage.bets).map(([playerId, amount]) => {
-                          const player = roomPlayers.find(p => p.id === playerId);
+                          const player = roomPlayers.find((p) => p.id === playerId);
                           return (
                             <div key={playerId} className="flex justify-between text-sm">
                               <span className="text-green-200">{player?.userName || 'Player'}</span>
@@ -529,9 +523,7 @@ export default function GameClient({ roomId }) {
               )}
 
               {!['betting', 'player_action'].includes(currentStage) && (
-                <p className="text-yellow-100/60 text-center">
-                  Waiting for game to progress...
-                </p>
+                <p className="text-yellow-100/60 text-center">Waiting for game to progress...</p>
               )}
             </div>
           )}
@@ -549,37 +541,26 @@ export default function GameClient({ roomId }) {
                 <p className="text-yellow-100/40 text-sm text-center">No players yet</p>
               ) : (
                 roomPlayers.map((player) => (
-                  <div
-                    key={player.id}
-                    className="bg-black/60 rounded-lg p-3 border border-yellow-700/50"
-                  >
+                  <div key={player.id} className="bg-black/60 rounded-lg p-3 border border-yellow-700/50">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-yellow-200 font-bold text-sm">
                           {player.userName}
-                          {player.userId === user?.id && (
-                            <span className="ml-2 text-xs text-yellow-400">(You)</span>
-                          )}
+                          {player.userId === user?.id && <span className="ml-2 text-xs text-yellow-400">(You)</span>}
                           {player.userId === room?.hostId && (
                             <span className="ml-2 text-xs text-green-400">(Host)</span>
                           )}
                         </p>
-                        <p className="text-yellow-100/60 text-xs">
-                          {player.userEmail}
-                        </p>
-                        <p className="text-yellow-100/40 text-xs font-mono">
-                          ID: {player.userId.substring(0, 8)}...
-                        </p>
+                        <p className="text-yellow-100/60 text-xs">{player.userEmail}</p>
+                        <p className="text-yellow-100/40 text-xs font-mono">ID: {player.userId.substring(0, 8)}...</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-yellow-200 font-bold text-sm">
-                          ${player.balance}
-                        </p>
-                        <p className={`text-xs font-semibold ${
-                          player.status === 'Active'
-                            ? 'text-green-400'
-                            : 'text-gray-400'
-                        }`}>
+                        <p className="text-yellow-200 font-bold text-sm">${player.balance}</p>
+                        <p
+                          className={`text-xs font-semibold ${
+                            player.status === 'Active' ? 'text-green-400' : 'text-gray-400'
+                          }`}
+                        >
                           {player.status}
                         </p>
                       </div>

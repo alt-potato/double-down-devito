@@ -44,7 +44,7 @@ export default function RoomsClient() {
             });
             if (playersRes.ok) {
               const players = await playersRes.json();
-              if (players.some(p => p.userId === userId)) {
+              if (players.some((p) => p.userId === userId)) {
                 console.log(`[fetchUserRooms] User ${userId} is in room ${room.id}`);
                 myRooms.push(room.id);
               }
@@ -74,7 +74,7 @@ export default function RoomsClient() {
       if (response.ok) {
         const updatedRooms = await response.json();
         // Filter to only show active rooms (extra safety check)
-        const activeRooms = updatedRooms.filter(room => room.isActive);
+        const activeRooms = updatedRooms.filter((room) => room.isActive);
         setRooms(activeRooms);
         setIsLoadingRooms(false);
       }
@@ -208,13 +208,11 @@ export default function RoomsClient() {
           <div className="bg-black/80 border-2 border-yellow-600 rounded-xl p-8 text-center">
             <p className="text-yellow-100 text-lg">Loading rooms...</p>
           </div>
-        ) : rooms.filter(room => !userRooms.includes(room.id)).length === 0 ? (
+        ) : rooms.filter((room) => !userRooms.includes(room.id)).length === 0 ? (
           <div className="bg-black/80 border-2 border-yellow-600 rounded-xl p-8 text-center">
             <p className="text-yellow-100 text-lg mb-2">No rooms available</p>
             <p className="text-yellow-300 text-sm mb-4">
-              {userRooms.length > 0
-                ? "You're already in a game!"
-                : "Create a new game to get started!"}
+              {userRooms.length > 0 ? "You're already in a game!" : 'Create a new game to get started!'}
             </p>
             {userRooms.length > 0 && (
               <button
@@ -227,51 +225,53 @@ export default function RoomsClient() {
           </div>
         ) : (
           <ul className="space-y-4">
-            {rooms.filter(room => !userRooms.includes(room.id)).map((room) => (
-              <li
-                key={room.id}
-                className="bg-black/80 border-2 border-yellow-600 rounded-xl p-5 shadow-lg"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="text-yellow-200 font-bold text-lg mb-1">
-                      {room.description || 'Blackjack Game'}
+            {rooms
+              .filter((room) => !userRooms.includes(room.id))
+              .map((room) => (
+                <li key={room.id} className="bg-black/80 border-2 border-yellow-600 rounded-xl p-5 shadow-lg">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="text-yellow-200 font-bold text-lg mb-1">
+                        {room.description || 'Blackjack Game'}
+                      </div>
+                      <div className="text-yellow-100/60 font-mono text-xs mb-2">ID: {room.id.substring(0, 8)}...</div>
                     </div>
-                    <div className="text-yellow-100/60 font-mono text-xs mb-2">
-                      ID: {room.id.substring(0, 8)}...
+                    <div
+                      className={`px-2 py-1 rounded text-xs font-semibold ${
+                        room.isActive
+                          ? 'bg-green-600/20 text-green-300 border border-green-600'
+                          : 'bg-gray-600/20 text-gray-300 border border-gray-600'
+                      }`}
+                    >
+                      {room.isActive ? 'Active' : 'Waiting'}
                     </div>
                   </div>
-                  <div className={`px-2 py-1 rounded text-xs font-semibold ${
-                    room.isActive
-                      ? 'bg-green-600/20 text-green-300 border border-green-600'
-                      : 'bg-gray-600/20 text-gray-300 border border-gray-600'
-                  }`}>
-                    {room.isActive ? 'Active' : 'Waiting'}
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <div className="text-yellow-300 text-sm">
+                      Mode: <span className="font-bold text-yellow-200">{room.gameMode}</span>
+                    </div>
+                    <div className="text-yellow-300 text-sm">
+                      Min Bet: <span className="font-bold text-yellow-200">${getMinBet(room)}</span>
+                    </div>
+                    <div className="text-yellow-300 text-sm">
+                      Players:{' '}
+                      <span className="font-bold text-yellow-200">
+                        {room.minPlayers}-{room.maxPlayers}
+                      </span>
+                    </div>
+                    <div className="text-yellow-300 text-sm">
+                      Public: <span className="font-bold text-yellow-200">{room.isPublic ? 'Yes' : 'No'}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <div className="text-yellow-300 text-sm">
-                    Mode: <span className="font-bold text-yellow-200">{room.gameMode}</span>
-                  </div>
-                  <div className="text-yellow-300 text-sm">
-                    Min Bet: <span className="font-bold text-yellow-200">${getMinBet(room)}</span>
-                  </div>
-                  <div className="text-yellow-300 text-sm">
-                    Players: <span className="font-bold text-yellow-200">{room.minPlayers}-{room.maxPlayers}</span>
-                  </div>
-                  <div className="text-yellow-300 text-sm">
-                    Public: <span className="font-bold text-yellow-200">{room.isPublic ? 'Yes' : 'No'}</span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleJoinRoom(room.id)}
-                  disabled={joiningRoomId === room.id}
-                  className="w-full py-2 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-black font-bold rounded-lg hover:from-yellow-500 hover:to-yellow-700 transition-all duration-200 border-2 border-yellow-700 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {joiningRoomId === room.id ? 'Joining...' : 'Join Room'}
-                </button>
-              </li>
-            ))}
+                  <button
+                    onClick={() => handleJoinRoom(room.id)}
+                    disabled={joiningRoomId === room.id}
+                    className="w-full py-2 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-black font-bold rounded-lg hover:from-yellow-500 hover:to-yellow-700 transition-all duration-200 border-2 border-yellow-700 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {joiningRoomId === room.id ? 'Joining...' : 'Join Room'}
+                  </button>
+                </li>
+              ))}
           </ul>
         )}
       </div>
