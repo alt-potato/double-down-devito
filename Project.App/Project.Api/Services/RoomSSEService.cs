@@ -69,6 +69,21 @@ public class RoomSSEService : IRoomSSEService
         // broadcast event using lowercase event type
         string eventPayload =
             $"event: {eventType.ToString().ToLowerInvariant()}\ndata: {JsonSerializer.Serialize(data, data.GetType())}\n\n";
+
+        // // Use camelCase naming to match ASP.NET Core controller responses
+        // var options = new JsonSerializerOptions
+        // {
+        //     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        // };
+        // string serializedData = JsonSerializer.Serialize(data, options);
+        // Console.WriteLine(
+        //     $"[SSE] Broadcasting to room {roomId}: event={eventName}, data length={serializedData.Length}"
+        // );
+        // Console.WriteLine(
+        //     $"[SSE] Data preview: {serializedData.Substring(0, Math.Min(200, serializedData.Length))}..."
+        // );
+
+        // string eventPayload = $"event: {eventName}\ndata: {serializedData}\n\n";
         List<string> closedConnections = [];
 
         foreach ((string connectionId, StreamWriter writer) in connections)
@@ -103,5 +118,35 @@ public class RoomSSEService : IRoomSSEService
                 await removedWriter.DisposeAsync();
             }
         }
+    }
+
+    public async Task CloseAllConnectionsAsync()
+    {
+        Console.WriteLine("[SSE] Closing all SSE connections for graceful shutdown...");
+
+        foreach (var roomConnections in _connections.Values)
+        {
+            foreach (var writer in roomConnections.Values)
+            {
+                try
+                {
+                    await writer.DisposeAsync();
+                }
+                catch
+                {
+                    // Ignore errors during shutdown
+                }
+            }
+            roomConnections.Clear();
+        }
+        _connections.Clear();
+
+        Console.WriteLine("[SSE] All SSE connections closed.");
+    }
+
+    public void Dispose()
+    {
+        CloseAllConnectionsAsync().GetAwaiter().GetResult();
+        GC.SuppressFinalize(this);
     }
 }

@@ -125,7 +125,7 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
 
                 // Replace IDeckApiService with mock
                 services.RemoveAll<IDeckApiService>();
-                services.AddSingleton<IDeckApiService>(mockDeckService.Object);
+                services.AddSingleton(mockDeckService.Object);
             }
         );
 
@@ -144,6 +144,7 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
         // create first player
         var player0Id = Guid.CreateVersion7();
         var client0 = appFactory.CreateClient();
+        client0.DefaultRequestHeaders.Add(TestAuthHandler.TestUserHeader, player0Id.ToString()); // for auth handler
 
         await using (var scope = appFactory.Services.CreateAsyncScope())
         {
@@ -196,6 +197,7 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
         {
             var userId = Guid.CreateVersion7();
             var client = appFactory.CreateClient();
+            client.DefaultRequestHeaders.Add(TestAuthHandler.TestUserHeader, userId.ToString()); // for auth handler
             var (reader, cts) = await client.OpenSseConnection(roomId);
             players.Add((userId, client, reader, cts));
 
@@ -714,6 +716,7 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
         // create first player
         var player0Id = Guid.CreateVersion7();
         var client0 = appFactory.CreateClient();
+        client0.DefaultRequestHeaders.Add(TestAuthHandler.TestUserHeader, player0Id.ToString()); // for auth handler
 
         await using (var scope = appFactory.Services.CreateAsyncScope())
         {
@@ -766,6 +769,7 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
         {
             var userId = Guid.CreateVersion7();
             var client = appFactory.CreateClient();
+            client.DefaultRequestHeaders.Add(TestAuthHandler.TestUserHeader, userId.ToString());
             var (reader, cts) = await client.OpenSseConnection(roomId);
             players.Add((userId, client, reader, cts));
 
