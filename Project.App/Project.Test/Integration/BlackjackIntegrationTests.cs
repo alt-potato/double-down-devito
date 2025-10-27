@@ -5,6 +5,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Project.Api;
 using Project.Api.Data;
@@ -15,6 +16,7 @@ using Project.Api.Services;
 using Project.Api.Services.Interface;
 using Project.Api.Utilities.Constants;
 using Project.Api.Utilities.Enums;
+using Project.Api.Utilities.Extensions;
 using Project.Test.Helpers;
 using Xunit;
 
@@ -30,7 +32,7 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
     public async Task BlackjackGameFlow_OneRound_ShouldCompleteSuccessfully()
     {
         // --- SETUP ---
-        var sseService = new RoomSSEService();
+        var sseService = new RoomSSEService(NullLogger<RoomSSEService>.Instance);
 
         var cardSequence = new Queue<CardDTO>(
             [
@@ -520,7 +522,7 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
     public async Task BlackjackGameFlow_TwoRounds_ShouldCompleteSuccessfully()
     {
         // --- SETUP ---
-        var sseService = new RoomSSEService();
+        var sseService = new RoomSSEService(NullLogger<RoomSSEService>.Instance);
 
         var cardSequence = new Queue<CardDTO>(
             [
@@ -1412,7 +1414,7 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
                 throw new EndOfStreamException("SSE stream ended unexpectedly.");
             }
 
-            var eventTypeString = eventLine.Replace("event: ", "");
+            var eventTypeString = eventLine.Replace("event: ", "").ToPascalCase();
             Enum.TryParse<RoomEventType>(eventTypeString, true, out var eventType)
                 .Should()
                 .BeTrue($"because '{eventTypeString}' should be a valid RoomEventType");
