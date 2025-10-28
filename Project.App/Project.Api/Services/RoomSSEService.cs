@@ -3,15 +3,23 @@ using System.Text.Json;
 using Project.Api.Models.Games;
 using Project.Api.Services.Interface;
 using Project.Api.Utilities.Enums;
+using Project.Api.Utilities.Extensions;
 
 namespace Project.Api.Services;
 
-public class RoomSSEService : IRoomSSEService
+public class RoomSSEService(ILogger<RoomSSEService> logger) : IRoomSSEService
 {
+    private readonly ILogger<RoomSSEService> _logger = logger;
+
     private readonly ConcurrentDictionary<
         Guid,
         ConcurrentDictionary<string, StreamWriter>
     > _connections = new();
+
+    private readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase, // use js convention instead of C#
+    };
 
     public async Task AddConnectionAsync(Guid roomId, HttpResponse response)
     {
@@ -66,26 +74,23 @@ public class RoomSSEService : IRoomSSEService
             return;
         }
 
-        // broadcast event using lowercase event type
-        string eventPayload =
-            $"event: {eventType.ToString().ToLowerInvariant()}\ndata: {JsonSerializer.Serialize(data, data.GetType())}\n\n";
+        string serializedData = JsonSerializer.Serialize(data, data.GetType(), _jsonOptions);
+        string eventName = eventType.ToString().ToSnakeCase(); // use snake_case event type
 
-        // // Use camelCase naming to match ASP.NET Core controller responses
-        // var options = new JsonSerializerOptions
-        // {
-        //     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        // };
-        // string serializedData = JsonSerializer.Serialize(data, options);
-        // Console.WriteLine(
-        //     $"[SSE] Broadcasting to room {roomId}: event={eventName}, data length={serializedData.Length}"
-        // );
-        // Console.WriteLine(
-        //     $"[SSE] Data preview: {serializedData.Substring(0, Math.Min(200, serializedData.Length))}..."
-        // );
+        _logger.LogInformation(
+            "[SSE] Broadcasting to room {roomId}: event={eventName}, data length={serializedData.Length}",
+            roomId,
+            eventName,
+            serializedData.Length
+        );
+        _logger.LogInformation(
+            "[SSE] Data preview: {serializedData}",
+            serializedData[..Math.Min(256, serializedData.Length)]
+        );
 
-        // string eventPayload = $"event: {eventName}\ndata: {serializedData}\n\n";
+        string eventPayload = $"event: {eventName}\ndata: {serializedData}\n\n";
+
         List<string> closedConnections = [];
-
         foreach ((string connectionId, StreamWriter writer) in connections)
         {
             try

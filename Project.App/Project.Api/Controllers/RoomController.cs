@@ -269,13 +269,13 @@ public class RoomController(
             throw new BadRequestException("Message content cannot be empty.");
         }
 
-        MessageEventData data = new()
+        ChatEventData data = new()
         {
             Sender = User.Identity?.Name ?? "Anonymous",
             Content = message.Content,
         };
 
-        await _roomSSEService.BroadcastEventAsync(roomId, RoomEventType.Message, data);
+        await _roomSSEService.BroadcastEventAsync(roomId, RoomEventType.Chat, data);
         return Ok();
     }
 
