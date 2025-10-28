@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { createSSEListener, GameStateSetters } from '@/lib/sse/GameEventHandler';
+import { ChatEventData } from '@/lib/sse/GameEvents.types';
 
 export default function GameClient({ roomId }) {
   const router = useRouter();
@@ -10,7 +12,7 @@ export default function GameClient({ roomId }) {
   const [roomPlayers, setRoomPlayers] = useState([]);
   const [gameState, setGameState] = useState(null);
   const [gameConfig, setGameConfig] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<ChatEventData[]>([]);
   const [chatMessage, setChatMessage] = useState('');
   const [betAmount, setBetAmount] = useState(10);
   const [loading, setLoading] = useState(true);
@@ -104,7 +106,7 @@ export default function GameClient({ roomId }) {
 
   // Setup SSE connection
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !user) return; // Wait for user data to be available
 
     const eventSource = new EventSource(`${API_URL}/api/room/${roomId}/events`, {
       withCredentials: true,
@@ -114,47 +116,34 @@ export default function GameClient({ roomId }) {
       console.log('[SSE] Connection opened');
     };
 
-    eventSource.addEventListener('message', (event) => {
-      console.log('[SSE] Message received:', event.data);
-      setMessages((prev) => [...prev, { type: 'chat', data: event.data }]);
-    });
+    // Define the state setters and functions to pass to the event handler
+    const setters: GameStateSetters = {
+      setMessages,
+      setRoomPlayers,
+      setGameState,
+      setRoom,
+      fetchRoomPlayers,
+      user,
+    };
 
-    eventSource.addEventListener('room_updated', (event) => {
-      console.log('[SSE] Room updated:', event.data);
-      try {
-        const updatedRoom = JSON.parse(event.data);
-        console.log('[SSE] Parsed room data:', updatedRoom);
-        console.log('[SSE] MaxPlayers:', updatedRoom.maxPlayers);
+    // Create a single listener that will process all incoming game events
+    const listener = createSSEListener(setters);
 
-        // Check if room has been closed (no players left)
-        if (updatedRoom.isActive === false) {
-          alert('The room has been closed.');
-          router.push('/rooms');
-          return;
-        }
+    // List of all event types we want to handle
+    const eventTypes = [
+      'chat',
+      'game_state_update',
+      'player_action',
+      'player_join',
+      'player_leave',
+      'host_change',
+      'player_reveal',
+      'dealer_reveal',
+    ];
 
-        // Check if host has changed (host left and transferred to someone else)
-        if (room && room.hostId !== updatedRoom.hostId) {
-          if (updatedRoom.hostId === user?.id) {
-            alert('The previous host left. You are now the host!');
-          } else {
-            alert('The host has left. Host privileges have been transferred.');
-          }
-        }
-
-        setRoom(updatedRoom);
-
-        // Update game state
-        if (updatedRoom.gameState) {
-          const parsedState = JSON.parse(updatedRoom.gameState);
-          setGameState(parsedState);
-        }
-
-        // Refresh room players
-        fetchRoomPlayers();
-      } catch (e) {
-        console.error('Failed to parse room update:', e);
-      }
+    // Attach the listener to each event type
+    eventTypes.forEach((type) => {
+      eventSource.addEventListener(type, listener);
     });
 
     eventSource.onerror = (error) => {
@@ -166,10 +155,15 @@ export default function GameClient({ roomId }) {
 
     return () => {
       if (eventSourceRef.current) {
+        // Remove all specific listeners before closing
+        eventTypes.forEach((type) => {
+          eventSourceRef.current.removeEventListener(type, listener);
+        });
         eventSourceRef.current.close();
       }
     };
-  }, [roomId, API_URL]);
+    // Add `user` to dependency array to ensure setters object has the latest user state
+  }, [roomId, API_URL, user]);
 
   const handleStartGame = async () => {
     try {
@@ -495,7 +489,7 @@ export default function GameClient({ roomId }) {
                           return (
                             <div key={playerId} className="flex justify-between text-sm">
                               <span className="text-green-200">{player?.userName || 'Player'}</span>
-                              <span className="text-green-400 font-bold">${amount}</span>
+                              <span className="text-green-400 font-bold">${Number(amount).toLocaleString()}</span>
                             </div>
                           );
                         })}
@@ -580,7 +574,8 @@ export default function GameClient({ roomId }) {
               ) : (
                 messages.map((msg, idx) => (
                   <div key={idx} className="text-yellow-100 text-sm mb-2">
-                    {msg.data}
+                    <span className="font-bold text-yellow-300">{msg.sender}: </span>
+                    <span>{msg.content}</span>
                   </div>
                 ))
               )}
