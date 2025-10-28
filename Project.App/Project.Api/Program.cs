@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
@@ -48,6 +50,12 @@ public class Program
         builder.Services.AddAuth(builder.Configuration, builder.Environment);
 
         builder.Services.AddControllers();
+
+        // configure Fluent autovalidation
+        builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+        builder.Services.AddFluentValidationAutoValidation();
+        builder.Services.AddFluentValidationClientsideAdapters();
+
         builder.Services.AddOpenApi();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();

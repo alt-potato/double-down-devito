@@ -426,90 +426,91 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
         // With in-memory DB and mocks, verifying rollback directly is hard, but exception propagation implies it.
     }
 
-    [Fact]
-    public async Task CreateRoomAsync_ThrowsBadRequestException_WhenMinPlayersLessThanOne()
-    {
-        // Arrange
-        var createDto = new CreateRoomDTO
-        {
-            HostId = Guid.NewGuid(),
-            IsPublic = true,
-            GameMode = GameModes.Blackjack,
-            GameConfig = "{}",
-            MaxPlayers = 6,
-            MinPlayers = 0, // Invalid
-        };
+    // delegated to fluent validation
+    // [Fact]
+    // public async Task CreateRoomAsync_ThrowsBadRequestException_WhenMinPlayersLessThanOne()
+    // {
+    //     // Arrange
+    //     var createDto = new CreateRoomDTO
+    //     {
+    //         HostId = Guid.NewGuid(),
+    //         IsPublic = true,
+    //         GameMode = GameModes.Blackjack,
+    //         GameConfig = "{}",
+    //         MaxPlayers = 6,
+    //         MinPlayers = 0, // Invalid
+    //     };
 
-        // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _roomService.CreateRoomAsync(createDto)
-        );
-        _roomRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Room>()), Times.Never);
-    }
+    //     // Act & Assert
+    //     await Assert.ThrowsAsync<BadRequestException>(() =>
+    //         _roomService.CreateRoomAsync(createDto)
+    //     );
+    //     _roomRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Room>()), Times.Never);
+    // }
 
-    [Fact]
-    public async Task CreateRoomAsync_ThrowsBadRequestException_WhenMaxPlayersLessThanMinPlayers()
-    {
-        // Arrange
-        var createDto = new CreateRoomDTO
-        {
-            HostId = Guid.NewGuid(),
-            IsPublic = true,
-            GameMode = GameModes.Blackjack,
-            GameConfig = "{}",
-            MaxPlayers = 2,
-            MinPlayers = 5, // Invalid - greater than MaxPlayers
-        };
+    // [Fact]
+    // public async Task CreateRoomAsync_ThrowsBadRequestException_WhenMaxPlayersLessThanMinPlayers()
+    // {
+    //     // Arrange
+    //     var createDto = new CreateRoomDTO
+    //     {
+    //         HostId = Guid.NewGuid(),
+    //         IsPublic = true,
+    //         GameMode = GameModes.Blackjack,
+    //         GameConfig = "{}",
+    //         MaxPlayers = 2,
+    //         MinPlayers = 5, // Invalid - greater than MaxPlayers
+    //     };
 
-        // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _roomService.CreateRoomAsync(createDto)
-        );
-        _roomRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Room>()), Times.Never);
-    }
+    //     // Act & Assert
+    //     await Assert.ThrowsAsync<BadRequestException>(() =>
+    //         _roomService.CreateRoomAsync(createDto)
+    //     );
+    //     _roomRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Room>()), Times.Never);
+    // }
 
-    [Fact]
-    public async Task CreateRoomAsync_ThrowsBadRequestException_WhenGameModeIsEmpty()
-    {
-        // Arrange
-        var createDto = new CreateRoomDTO
-        {
-            HostId = Guid.NewGuid(),
-            IsPublic = true,
-            GameMode = "", // Invalid
-            GameConfig = "{}",
-            MaxPlayers = 6,
-            MinPlayers = 2,
-        };
+    // [Fact]
+    // public async Task CreateRoomAsync_ThrowsBadRequestException_WhenGameModeIsEmpty()
+    // {
+    //     // Arrange
+    //     var createDto = new CreateRoomDTO
+    //     {
+    //         HostId = Guid.NewGuid(),
+    //         IsPublic = true,
+    //         GameMode = "", // Invalid
+    //         GameConfig = "{}",
+    //         MaxPlayers = 6,
+    //         MinPlayers = 2,
+    //     };
 
-        // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _roomService.CreateRoomAsync(createDto)
-        );
-        _roomRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Room>()), Times.Never);
-    }
+    //     // Act & Assert
+    //     await Assert.ThrowsAsync<BadRequestException>(() =>
+    //         _roomService.CreateRoomAsync(createDto)
+    //     );
+    //     _roomRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Room>()), Times.Never);
+    // }
 
-    [Fact]
-    public async Task CreateRoomAsync_ThrowsBadRequestException_WhenDescriptionTooLong()
-    {
-        // Arrange
-        var createDto = new CreateRoomDTO
-        {
-            HostId = Guid.NewGuid(),
-            IsPublic = true,
-            GameMode = GameModes.Blackjack,
-            GameConfig = "{}",
-            Description = new string('a', 501), // 501 characters - too long
-            MaxPlayers = 6,
-            MinPlayers = 2,
-        };
+    // [Fact]
+    // public async Task CreateRoomAsync_ThrowsBadRequestException_WhenDescriptionTooLong()
+    // {
+    //     // Arrange
+    //     var createDto = new CreateRoomDTO
+    //     {
+    //         HostId = Guid.NewGuid(),
+    //         IsPublic = true,
+    //         GameMode = GameModes.Blackjack,
+    //         GameConfig = "{}",
+    //         Description = new string('a', 501), // 501 characters - too long
+    //         MaxPlayers = 6,
+    //         MinPlayers = 2,
+    //     };
 
-        // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _roomService.CreateRoomAsync(createDto)
-        );
-        _roomRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Room>()), Times.Never);
-    }
+    //     // Act & Assert
+    //     await Assert.ThrowsAsync<BadRequestException>(() =>
+    //         _roomService.CreateRoomAsync(createDto)
+    //     );
+    //     _roomRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Room>()), Times.Never);
+    // }
 
     #endregion
 
@@ -576,98 +577,99 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
         _roomRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Room>()), Times.Never);
     }
 
-    [Fact]
-    public async Task UpdateRoomAsync_ThrowsBadRequestException_WhenMinPlayersLessThanOne()
-    {
-        // Arrange
-        var roomId = Guid.NewGuid();
-        var updateDto = new UpdateRoomDTO
-        {
-            Id = roomId,
-            HostId = Guid.NewGuid(),
-            IsPublic = true,
-            GameMode = GameModes.Blackjack,
-            GameConfig = "{}",
-            MaxPlayers = 6,
-            MinPlayers = 0, // Invalid
-        };
+    // delegated to fluent validation
+    // [Fact]
+    // public async Task UpdateRoomAsync_ThrowsBadRequestException_WhenMinPlayersLessThanOne()
+    // {
+    //     // Arrange
+    //     var roomId = Guid.NewGuid();
+    //     var updateDto = new UpdateRoomDTO
+    //     {
+    //         Id = roomId,
+    //         HostId = Guid.NewGuid(),
+    //         IsPublic = true,
+    //         GameMode = GameModes.Blackjack,
+    //         GameConfig = "{}",
+    //         MaxPlayers = 6,
+    //         MinPlayers = 0, // Invalid
+    //     };
 
-        // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _roomService.UpdateRoomAsync(updateDto)
-        );
-        _roomRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Room>()), Times.Never);
-    }
+    //     // Act & Assert
+    //     await Assert.ThrowsAsync<BadRequestException>(() =>
+    //         _roomService.UpdateRoomAsync(updateDto)
+    //     );
+    //     _roomRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Room>()), Times.Never);
+    // }
 
-    [Fact]
-    public async Task UpdateRoomAsync_ThrowsBadRequestException_WhenMaxPlayersLessThanMinPlayers()
-    {
-        // Arrange
-        var roomId = Guid.NewGuid();
-        var updateDto = new UpdateRoomDTO
-        {
-            Id = roomId,
-            HostId = Guid.NewGuid(),
-            IsPublic = true,
-            GameMode = GameModes.Blackjack,
-            GameConfig = "{}",
-            MaxPlayers = 2,
-            MinPlayers = 5, // Invalid - greater than MaxPlayers
-        };
+    // [Fact]
+    // public async Task UpdateRoomAsync_ThrowsBadRequestException_WhenMaxPlayersLessThanMinPlayers()
+    // {
+    //     // Arrange
+    //     var roomId = Guid.NewGuid();
+    //     var updateDto = new UpdateRoomDTO
+    //     {
+    //         Id = roomId,
+    //         HostId = Guid.NewGuid(),
+    //         IsPublic = true,
+    //         GameMode = GameModes.Blackjack,
+    //         GameConfig = "{}",
+    //         MaxPlayers = 2,
+    //         MinPlayers = 5, // Invalid - greater than MaxPlayers
+    //     };
 
-        // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _roomService.UpdateRoomAsync(updateDto)
-        );
-        _roomRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Room>()), Times.Never);
-    }
+    //     // Act & Assert
+    //     await Assert.ThrowsAsync<BadRequestException>(() =>
+    //         _roomService.UpdateRoomAsync(updateDto)
+    //     );
+    //     _roomRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Room>()), Times.Never);
+    // }
 
-    [Fact]
-    public async Task UpdateRoomAsync_ThrowsBadRequestException_WhenGameModeIsEmpty()
-    {
-        // Arrange
-        var roomId = Guid.NewGuid();
-        var updateDto = new UpdateRoomDTO
-        {
-            Id = roomId,
-            HostId = Guid.NewGuid(),
-            IsPublic = true,
-            GameMode = "", // Invalid
-            GameConfig = "{}",
-            MaxPlayers = 6,
-            MinPlayers = 2,
-        };
+    // [Fact]
+    // public async Task UpdateRoomAsync_ThrowsBadRequestException_WhenGameModeIsEmpty()
+    // {
+    //     // Arrange
+    //     var roomId = Guid.NewGuid();
+    //     var updateDto = new UpdateRoomDTO
+    //     {
+    //         Id = roomId,
+    //         HostId = Guid.NewGuid(),
+    //         IsPublic = true,
+    //         GameMode = "", // Invalid
+    //         GameConfig = "{}",
+    //         MaxPlayers = 6,
+    //         MinPlayers = 2,
+    //     };
 
-        // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _roomService.UpdateRoomAsync(updateDto)
-        );
-        _roomRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Room>()), Times.Never);
-    }
+    //     // Act & Assert
+    //     await Assert.ThrowsAsync<BadRequestException>(() =>
+    //         _roomService.UpdateRoomAsync(updateDto)
+    //     );
+    //     _roomRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Room>()), Times.Never);
+    // }
 
-    [Fact]
-    public async Task UpdateRoomAsync_ThrowsBadRequestException_WhenDescriptionTooLong()
-    {
-        // Arrange
-        var roomId = Guid.NewGuid();
-        var updateDto = new UpdateRoomDTO
-        {
-            Id = roomId,
-            HostId = Guid.NewGuid(),
-            IsPublic = true,
-            GameMode = GameModes.Blackjack,
-            GameConfig = "{}",
-            Description = new string('a', 501), // 501 characters - too long
-            MaxPlayers = 6,
-            MinPlayers = 2,
-        };
+    // [Fact]
+    // public async Task UpdateRoomAsync_ThrowsBadRequestException_WhenDescriptionTooLong()
+    // {
+    //     // Arrange
+    //     var roomId = Guid.NewGuid();
+    //     var updateDto = new UpdateRoomDTO
+    //     {
+    //         Id = roomId,
+    //         HostId = Guid.NewGuid(),
+    //         IsPublic = true,
+    //         GameMode = GameModes.Blackjack,
+    //         GameConfig = "{}",
+    //         Description = new string('a', 501), // 501 characters - too long
+    //         MaxPlayers = 6,
+    //         MinPlayers = 2,
+    //     };
 
-        // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _roomService.UpdateRoomAsync(updateDto)
-        );
-        _roomRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Room>()), Times.Never);
-    }
+    //     // Act & Assert
+    //     await Assert.ThrowsAsync<BadRequestException>(() =>
+    //         _roomService.UpdateRoomAsync(updateDto)
+    //     );
+    //     _roomRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Room>()), Times.Never);
+    // }
 
     #endregion
 
@@ -779,37 +781,38 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
         _roomRepositoryMock.Verify(r => r.UpdateGameStateAsync(roomId, gameState), Times.Once);
     }
 
-    [Fact]
-    public async Task UpdateGameStateAsync_ThrowsBadRequestException_WhenGameStateIsEmpty()
-    {
-        // Arrange
-        var roomId = Guid.NewGuid();
+    // delegated to fluent validation
+    // [Fact]
+    // public async Task UpdateGameStateAsync_ThrowsBadRequestException_WhenGameStateIsEmpty()
+    // {
+    //     // Arrange
+    //     var roomId = Guid.NewGuid();
 
-        // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _roomService.UpdateGameStateAsync(roomId, "")
-        );
-        _roomRepositoryMock.Verify(
-            r => r.UpdateGameStateAsync(It.IsAny<Guid>(), It.IsAny<string>()),
-            Times.Never
-        );
-    }
+    //     // Act & Assert
+    //     await Assert.ThrowsAsync<BadRequestException>(() =>
+    //         _roomService.UpdateGameStateAsync(roomId, "")
+    //     );
+    //     _roomRepositoryMock.Verify(
+    //         r => r.UpdateGameStateAsync(It.IsAny<Guid>(), It.IsAny<string>()),
+    //         Times.Never
+    //     );
+    // }
 
-    [Fact]
-    public async Task UpdateGameStateAsync_ThrowsBadRequestException_WhenGameStateIsWhitespace()
-    {
-        // Arrange
-        var roomId = Guid.NewGuid();
+    // [Fact]
+    // public async Task UpdateGameStateAsync_ThrowsBadRequestException_WhenGameStateIsWhitespace()
+    // {
+    //     // Arrange
+    //     var roomId = Guid.NewGuid();
 
-        // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _roomService.UpdateGameStateAsync(roomId, "   ")
-        );
-        _roomRepositoryMock.Verify(
-            r => r.UpdateGameStateAsync(It.IsAny<Guid>(), It.IsAny<string>()),
-            Times.Never
-        );
-    }
+    //     // Act & Assert
+    //     await Assert.ThrowsAsync<BadRequestException>(() =>
+    //         _roomService.UpdateGameStateAsync(roomId, "   ")
+    //     );
+    //     _roomRepositoryMock.Verify(
+    //         r => r.UpdateGameStateAsync(It.IsAny<Guid>(), It.IsAny<string>()),
+    //         Times.Never
+    //     );
+    // }
 
     #endregion
 

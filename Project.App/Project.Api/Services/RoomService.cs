@@ -72,25 +72,6 @@ public class RoomService(
     {
         _logger.LogInformation("Creating new room...");
 
-        Validate(dto);
-
-        // TODO: use automapper
-        // Room room = new()
-        // {
-        //     Id = Guid.CreateVersion7(),
-        //     HostId = dto.HostId,
-        //     IsPublic = dto.IsPublic,
-        //     GameMode = dto.GameMode.ToLowerInvariant(),
-        //     GameState = "{}", // empty initial state
-        //     GameConfig = dto.GameConfig,
-        //     Description = dto.Description,
-        //     MaxPlayers = dto.MaxPlayers,
-        //     MinPlayers = dto.MinPlayers,
-        //     CreatedAt = DateTimeOffset.UtcNow,
-        //     DeckId = "", // no deck yet
-        //     IsActive = true,
-        // };
-
         Room room = _mapper.Map<Room>(dto);
 
         room.Id = Guid.CreateVersion7();
@@ -125,20 +106,9 @@ public class RoomService(
 
     public async Task<RoomDTO?> UpdateRoomAsync(UpdateRoomDTO dto)
     {
-        Validate(dto);
-
         var existingRoom = await _roomRepository.GetByIdAsync(dto.Id);
         if (existingRoom is null)
             return null;
-
-        // TODO: use automapper
-        // existingRoom.HostId = dto.HostId;
-        // existingRoom.IsPublic = dto.IsPublic;
-        // existingRoom.GameMode = dto.GameMode.ToLowerInvariant();
-        // existingRoom.GameConfig = dto.GameConfig;
-        // existingRoom.Description = dto.Description;
-        // existingRoom.MaxPlayers = dto.MaxPlayers;
-        // existingRoom.MinPlayers = dto.MinPlayers;
 
         _mapper.Map(dto, existingRoom);
 
@@ -398,23 +368,5 @@ public class RoomService(
 
         // Return the room (we already have it)
         return _mapper.Map<RoomDTO>(room);
-    }
-
-    // TODO: replace with FLuent API validator
-    private static void Validate(CreateRoomDTO dto)
-    {
-        if (dto.MinPlayers < 1)
-            throw new BadRequestException("Minimum players must be at least 1.");
-
-        if (dto.MaxPlayers < dto.MinPlayers)
-            throw new BadRequestException("Maximum players must be >= minimum players.");
-
-        if (string.IsNullOrWhiteSpace(dto.GameMode))
-            throw new BadRequestException("Game mode is required.");
-
-        // DeckId is now optional - it will be auto-created if not provided
-
-        if (dto.Description?.Length > 500)
-            throw new BadRequestException("Description can't be longer than 500 characters.");
     }
 }
