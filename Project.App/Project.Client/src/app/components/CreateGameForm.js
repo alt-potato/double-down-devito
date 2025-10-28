@@ -70,7 +70,7 @@ export default function CreateGameForm({ userId, onRoomCreated }) {
           hostId: userId,
           description: description,
           isPublic: true,
-          gameMode: 'Blackjack',
+          gameMode: 'blackjack',
           gameState: initialGameState,
           gameConfig: gameConfig,
           maxPlayers: maxPlayers,

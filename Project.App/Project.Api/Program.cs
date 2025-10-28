@@ -152,19 +152,24 @@ public static class ProgramExtensions
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         // scoped services
-        services.AddScoped<IGameService<IGameState, GameConfig>, BlackjackService>();
         services.AddScoped<IHandService, HandService>();
         services.AddScoped<IRoomService, RoomService>();
         services.AddScoped<IUserService, UserService>();
 
+        // singleton services
         services.AddHttpClient<IDeckApiService, DeckApiService>();
         services.AddSingleton<IRoomSSEService, RoomSSEService>();
 
+        // repository services
         services.AddScoped<IHandRepository, HandRepository>();
         services.AddScoped<IRoomPlayerRepository, RoomPlayerRepository>();
         services.AddScoped<IRoomRepository, RoomRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
 
+        // game services
+        services.AddScoped<IGameService<IGameState, GameConfig>, BlackjackService>();
+
+        // automapper!!!
         services.AddAutoMapper(typeof(Program));
 
         return services;

@@ -40,14 +40,14 @@ namespace Project.Test.Tests.Controllers
                 {
                     Id = Guid.NewGuid(),
                     HostId = Guid.NewGuid(),
-                    GameMode = "Blackjack",
+                    GameMode = "blackjack",
                     IsActive = true,
                 },
                 new RoomDTO
                 {
                     Id = Guid.NewGuid(),
                     HostId = Guid.NewGuid(),
-                    GameMode = "Poker",
+                    GameMode = "poker",
                     IsActive = true,
                 },
             };
@@ -123,7 +123,7 @@ namespace Project.Test.Tests.Controllers
             {
                 Id = roomId,
                 HostId = Guid.NewGuid(),
-                GameMode = "Blackjack",
+                GameMode = "blackjack",
             };
             _mockRoomService.Setup(service => service.GetRoomByIdAsync(roomId)).ReturnsAsync(room);
 
@@ -158,7 +158,7 @@ namespace Project.Test.Tests.Controllers
             {
                 Id = Guid.NewGuid(),
                 HostId = hostId,
-                GameMode = "Blackjack",
+                GameMode = "blackjack",
             };
             _mockRoomService
                 .Setup(service => service.GetRoomByHostIdAsync(hostId))
@@ -264,7 +264,7 @@ namespace Project.Test.Tests.Controllers
             {
                 HostId = Guid.NewGuid(),
                 IsPublic = true,
-                GameMode = "Blackjack",
+                GameMode = "blackjack",
                 MaxPlayers = 6,
                 MinPlayers = 2,
             };
@@ -315,7 +315,7 @@ namespace Project.Test.Tests.Controllers
             {
                 Id = roomId,
                 HostId = Guid.NewGuid(),
-                GameMode = "Blackjack",
+                GameMode = "blackjack",
             };
             _mockRoomService
                 .Setup(service => service.StartGameAsync(roomId, gameConfig))
@@ -339,7 +339,7 @@ namespace Project.Test.Tests.Controllers
             {
                 Id = roomId,
                 HostId = Guid.NewGuid(),
-                GameMode = "Blackjack",
+                GameMode = "blackjack",
             };
             _mockRoomService
                 .Setup(service => service.StartGameAsync(roomId, null))
@@ -484,7 +484,7 @@ namespace Project.Test.Tests.Controllers
             {
                 HostId = Guid.NewGuid(),
                 IsPublic = true,
-                GameMode = "Blackjack",
+                GameMode = "blackjack",
                 MaxPlayers = 4,
                 MinPlayers = 2,
                 Description = "A new game",
@@ -524,7 +524,7 @@ namespace Project.Test.Tests.Controllers
             var createDto = new CreateRoomDTO
             {
                 HostId = Guid.NewGuid(),
-                GameMode = "Blackjack",
+                GameMode = "blackjack",
                 MaxPlayers = 4,
                 MinPlayers = 2,
             };
@@ -553,7 +553,7 @@ namespace Project.Test.Tests.Controllers
                 Id = roomId,
                 HostId = Guid.NewGuid(),
                 IsPublic = true,
-                GameMode = "Blackjack",
+                GameMode = "blackjack",
                 MaxPlayers = 6,
                 MinPlayers = 2,
             };
@@ -620,7 +620,7 @@ namespace Project.Test.Tests.Controllers
             {
                 Id = roomId,
                 HostId = Guid.NewGuid(),
-                GameMode = "Blackjack",
+                GameMode = "blackjack",
             };
             _mockRoomService
                 .Setup(service => service.UpdateRoomAsync(updateDto))

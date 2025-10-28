@@ -212,7 +212,7 @@ public class RoomService(
         GameConfig config;
         try
         {
-            switch (room.GameMode)
+            switch (room.GameMode.ToLowerInvariant())
             {
                 case GameModes.Blackjack:
                     if (!string.IsNullOrWhiteSpace(gameConfigJson))
