@@ -71,18 +71,19 @@ public class RoomService(
 
         Validate(dto);
 
+        // TODO: use automapper
         Room room = new()
         {
             Id = Guid.CreateVersion7(),
             HostId = dto.HostId,
             IsPublic = dto.IsPublic,
-            GameMode = dto.GameMode,
+            GameMode = dto.GameMode.ToLowerInvariant(),
             GameState = "{}", // empty initial state
             GameConfig = dto.GameConfig,
             Description = dto.Description,
             MaxPlayers = dto.MaxPlayers,
             MinPlayers = dto.MinPlayers,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             DeckId = "", // no deck yet
             IsActive = true,
         };
@@ -119,9 +120,10 @@ public class RoomService(
         if (existingRoom is null)
             return null;
 
+        // TODO: use automapper
         existingRoom.HostId = dto.HostId;
         existingRoom.IsPublic = dto.IsPublic;
-        existingRoom.GameMode = dto.GameMode;
+        existingRoom.GameMode = dto.GameMode.ToLowerInvariant();
         existingRoom.GameConfig = dto.GameConfig;
         existingRoom.Description = dto.Description;
         existingRoom.MaxPlayers = dto.MaxPlayers;
