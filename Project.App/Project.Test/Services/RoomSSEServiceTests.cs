@@ -140,8 +140,8 @@ public class RoomSSEServiceTests
         await stream2.DisposeAsync();
 
         // Use the new RoomEventType enum and MessageEventData DTO
-        var eventType1 = RoomEventType.Message;
-        var eventData1 = new MessageEventData { Sender = "Test", Content = "Hello" };
+        var eventType1 = RoomEventType.Chat;
+        var eventData1 = new ChatEventData { Sender = "Test", Content = "Hello" };
         var expectedPayload1 =
             $"event: {eventType1.ToString().ToSnakeCase()}\ndata: {JsonSerializer.Serialize(eventData1, _jsonOptions)}\n\n";
 
@@ -163,8 +163,8 @@ public class RoomSSEServiceTests
         long afterFirstLength = stream1.Length;
 
         // Act: second broadcast
-        var eventType2 = RoomEventType.Message;
-        var eventData2 = new MessageEventData { Sender = "Test", Content = "Still here?" };
+        var eventType2 = RoomEventType.Chat;
+        var eventData2 = new ChatEventData { Sender = "Test", Content = "Still here?" };
         var expectedPayload2 =
             $"event: {eventType2.ToString().ToSnakeCase()}\ndata: {JsonSerializer.Serialize(eventData2, _jsonOptions)}\n\n";
         await sseService.BroadcastEventAsync(roomId, eventType2, eventData2);
@@ -192,8 +192,8 @@ public class RoomSSEServiceTests
         var roomId = Guid.NewGuid(); // A room with no connections
 
         // Use the new RoomEventType enum and MessageEventData DTO
-        var eventType = RoomEventType.Message;
-        var eventData = new MessageEventData { Sender = "Test", Content = "empty" };
+        var eventType = RoomEventType.Chat;
+        var eventData = new ChatEventData { Sender = "Test", Content = "empty" };
 
         // Act
         var exception = await Record.ExceptionAsync(() =>
