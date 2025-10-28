@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AutoMapper;
 using Project.Api.Data;
 using Project.Api.DTOs;
 using Project.Api.Models;
@@ -15,6 +16,7 @@ public class RoomService(
     IRoomPlayerRepository roomPlayerRepository,
     AppDbContext dbContext,
     IEnumerable<IGameService<IGameState, GameConfig>> gameServices,
+    IMapper mapper,
     ILogger<RoomService> logger
 ) : IRoomService
 {
@@ -23,6 +25,7 @@ public class RoomService(
     private readonly AppDbContext _dbContext = dbContext;
     private readonly Dictionary<string, IGameService<IGameState, GameConfig>> _gameServices =
         gameServices.ToDictionary(s => s.GameMode.ToLowerInvariant(), s => s); // Initialize dictionary
+    private readonly IMapper _mapper = mapper;
     private readonly ILogger<RoomService> _logger = logger;
 
     // Helper method to get the correct game service
@@ -38,31 +41,31 @@ public class RoomService(
     public async Task<RoomDTO?> GetRoomByIdAsync(Guid id)
     {
         var room = await _roomRepository.GetByIdAsync(id);
-        return room is null ? null : MapToResponseDto(room);
+        return room is null ? null : _mapper.Map<RoomDTO>(room);
     }
 
     public async Task<IEnumerable<RoomDTO>> GetAllRoomsAsync()
     {
         var rooms = await _roomRepository.GetAllAsync();
-        return rooms.Select(MapToResponseDto);
+        return _mapper.Map<IEnumerable<RoomDTO>>(rooms);
     }
 
     public async Task<IEnumerable<RoomDTO>> GetActiveRoomsAsync()
     {
         var rooms = await _roomRepository.GetActiveRoomsAsync();
-        return rooms.Select(MapToResponseDto);
+        return _mapper.Map<IEnumerable<RoomDTO>>(rooms);
     }
 
     public async Task<IEnumerable<RoomDTO>> GetPublicRoomsAsync()
     {
         var rooms = await _roomRepository.GetPublicRoomsAsync();
-        return rooms.Select(MapToResponseDto);
+        return _mapper.Map<IEnumerable<RoomDTO>>(rooms);
     }
 
     public async Task<RoomDTO?> GetRoomByHostIdAsync(Guid hostId)
     {
         var room = await _roomRepository.GetByHostIdAsync(hostId);
-        return room is null ? null : MapToResponseDto(room);
+        return room is null ? null : _mapper.Map<RoomDTO>(room);
     }
 
     public async Task<RoomDTO> CreateRoomAsync(CreateRoomDTO dto)
@@ -72,21 +75,29 @@ public class RoomService(
         Validate(dto);
 
         // TODO: use automapper
-        Room room = new()
-        {
-            Id = Guid.CreateVersion7(),
-            HostId = dto.HostId,
-            IsPublic = dto.IsPublic,
-            GameMode = dto.GameMode.ToLowerInvariant(),
-            GameState = "{}", // empty initial state
-            GameConfig = dto.GameConfig,
-            Description = dto.Description,
-            MaxPlayers = dto.MaxPlayers,
-            MinPlayers = dto.MinPlayers,
-            CreatedAt = DateTimeOffset.UtcNow,
-            DeckId = "", // no deck yet
-            IsActive = true,
-        };
+        // Room room = new()
+        // {
+        //     Id = Guid.CreateVersion7(),
+        //     HostId = dto.HostId,
+        //     IsPublic = dto.IsPublic,
+        //     GameMode = dto.GameMode.ToLowerInvariant(),
+        //     GameState = "{}", // empty initial state
+        //     GameConfig = dto.GameConfig,
+        //     Description = dto.Description,
+        //     MaxPlayers = dto.MaxPlayers,
+        //     MinPlayers = dto.MinPlayers,
+        //     CreatedAt = DateTimeOffset.UtcNow,
+        //     DeckId = "", // no deck yet
+        //     IsActive = true,
+        // };
+
+        Room room = _mapper.Map<Room>(dto);
+
+        room.Id = Guid.CreateVersion7();
+        room.GameState = "{}";
+        room.CreatedAt = DateTimeOffset.UtcNow;
+        room.DeckId = string.Empty;
+        room.IsActive = true;
 
         // Get the game service for the room's game mode
         var gameService = GetGameService(room.GameMode);
@@ -102,7 +113,7 @@ public class RoomService(
             await transaction.CommitAsync();
 
             _logger.LogInformation("Successfully created room with ID: {RoomId}", createdRoom.Id);
-            return MapToResponseDto(createdRoom);
+            return _mapper.Map<RoomDTO>(createdRoom);
         }
         catch (Exception ex)
         {
@@ -121,16 +132,18 @@ public class RoomService(
             return null;
 
         // TODO: use automapper
-        existingRoom.HostId = dto.HostId;
-        existingRoom.IsPublic = dto.IsPublic;
-        existingRoom.GameMode = dto.GameMode.ToLowerInvariant();
-        existingRoom.GameConfig = dto.GameConfig;
-        existingRoom.Description = dto.Description;
-        existingRoom.MaxPlayers = dto.MaxPlayers;
-        existingRoom.MinPlayers = dto.MinPlayers;
+        // existingRoom.HostId = dto.HostId;
+        // existingRoom.IsPublic = dto.IsPublic;
+        // existingRoom.GameMode = dto.GameMode.ToLowerInvariant();
+        // existingRoom.GameConfig = dto.GameConfig;
+        // existingRoom.Description = dto.Description;
+        // existingRoom.MaxPlayers = dto.MaxPlayers;
+        // existingRoom.MinPlayers = dto.MinPlayers;
+
+        _mapper.Map(dto, existingRoom);
 
         var updatedRoom = await _roomRepository.UpdateAsync(existingRoom);
-        return updatedRoom is null ? null : MapToResponseDto(updatedRoom);
+        return updatedRoom is null ? null : _mapper.Map<RoomDTO>(updatedRoom);
     }
 
     public async Task<bool> DeleteRoomAsync(Guid id)
@@ -279,7 +292,7 @@ public class RoomService(
         await gameService.StartGameAsync(roomId, config); // delegate setup to the generic game service
 
         _logger.LogInformation("Successfully started game for room {RoomId}", roomId);
-        return MapToResponseDto(
+        return _mapper.Map<RoomDTO>(
             await _roomRepository.GetByIdAsync(roomId)
                 ?? throw new NotFoundException($"Room with ID {roomId} not found.")
         );
@@ -366,7 +379,7 @@ public class RoomService(
         await gameService.PlayerJoinAsync(roomId, userId);
 
         // Return the room (no need to fetch again, we have it)
-        return MapToResponseDto(room);
+        return _mapper.Map<RoomDTO>(room);
     }
 
     public async Task<RoomDTO> LeaveRoomAsync(Guid roomId, Guid userId)
@@ -384,27 +397,7 @@ public class RoomService(
         await gameService.PlayerLeaveAsync(roomId, userId);
 
         // Return the room (we already have it)
-        return MapToResponseDto(room);
-    }
-
-    // TODO: replace with automapper implementation
-    private static RoomDTO MapToResponseDto(Room room)
-    {
-        return new RoomDTO
-        {
-            Id = room.Id,
-            HostId = room.HostId,
-            IsPublic = room.IsPublic,
-            GameMode = room.GameMode,
-            GameState = room.GameState,
-            GameConfig = room.GameConfig,
-            Description = room.Description,
-            MaxPlayers = room.MaxPlayers,
-            MinPlayers = room.MinPlayers,
-            DeckId = room.DeckId ?? string.Empty,
-            CreatedAt = room.CreatedAt,
-            IsActive = room.IsActive,
-        };
+        return _mapper.Map<RoomDTO>(room);
     }
 
     // TODO: replace with FLuent API validator

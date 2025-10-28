@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AutoMapper;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -25,6 +26,7 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
 
     private readonly Mock<IGameService<IGameState, GameConfig>> _mockBlackjackGameService;
     private readonly List<IGameService<IGameState, GameConfig>> _mockGameServices; // Collection for RoomService
+    private readonly Mock<IMapper> _mockMapper;
     private readonly Mock<ILogger<RoomService>> _loggerMock;
     private readonly AppDbContext _dbContext; // Real in-memory DbContext for transaction tests
     private readonly RoomService _roomService;
@@ -33,6 +35,7 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
     {
         _roomRepositoryMock = new Mock<IRoomRepository>();
         _roomPlayerRepositoryMock = new Mock<IRoomPlayerRepository>();
+        _mockMapper = new Mock<IMapper>();
         _loggerMock = new Mock<ILogger<RoomService>>();
 
         // Configure DbContext to ignore transaction warnings for in-memory provider
@@ -91,6 +94,7 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
             _roomPlayerRepositoryMock.Object,
             _dbContext, // Pass the real in-memory DbContext
             _mockGameServices, // Pass the collection of game services
+            _mockMapper.Object,
             _loggerMock.Object
         );
     }
@@ -110,15 +114,20 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
         // Arrange
         var roomId = Guid.NewGuid();
         var room = RepositoryTestHelper.CreateTestRoom(id: roomId);
+        var resultDto = new RoomDTO { Id = roomId };
+
         _roomRepositoryMock.Setup(r => r.GetByIdAsync(roomId)).ReturnsAsync(room);
+        _mockMapper.Setup(m => m.Map<RoomDTO>(room)).Returns(resultDto);
 
         // Act
         var result = await _roomService.GetRoomByIdAsync(roomId);
 
         // Assert
         result.Should().NotBeNull();
+        result!.Should().Be(resultDto);
         result!.Id.Should().Be(roomId);
         _roomRepositoryMock.Verify(r => r.GetByIdAsync(roomId), Times.Once);
+        _mockMapper.Verify(m => m.Map<RoomDTO>(room), Times.Once);
     }
 
     [Fact]
@@ -150,14 +159,19 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
             RepositoryTestHelper.CreateTestRoom(),
             RepositoryTestHelper.CreateTestRoom(),
         };
+        var roomDtos = rooms.Select(r => new RoomDTO { Id = r.Id }).ToList();
+
         _roomRepositoryMock.Setup(r => r.GetAllAsync()).ReturnsAsync(rooms);
+        _mockMapper.Setup(m => m.Map<IEnumerable<RoomDTO>>(rooms)).Returns(roomDtos);
 
         // Act
         var result = await _roomService.GetAllRoomsAsync();
 
         // Assert
         result.Should().HaveCount(3);
+        result.Should().BeEquivalentTo(roomDtos);
         _roomRepositoryMock.Verify(r => r.GetAllAsync(), Times.Once);
+        _mockMapper.Verify(m => m.Map<IEnumerable<RoomDTO>>(rooms), Times.Once);
     }
 
     [Fact]
@@ -187,7 +201,10 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
             RepositoryTestHelper.CreateTestRoom(isActive: true),
             RepositoryTestHelper.CreateTestRoom(isActive: true),
         };
+        var roomDtos = activeRooms.Select(r => new RoomDTO { Id = r.Id, IsActive = true }).ToList();
+
         _roomRepositoryMock.Setup(r => r.GetActiveRoomsAsync()).ReturnsAsync(activeRooms);
+        _mockMapper.Setup(m => m.Map<IEnumerable<RoomDTO>>(activeRooms)).Returns(roomDtos);
 
         // Act
         var result = await _roomService.GetActiveRoomsAsync();
@@ -196,6 +213,7 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
         result.Should().HaveCount(2);
         result.Should().AllSatisfy(r => r.IsActive.Should().BeTrue());
         _roomRepositoryMock.Verify(r => r.GetActiveRoomsAsync(), Times.Once);
+        _mockMapper.Verify(m => m.Map<IEnumerable<RoomDTO>>(activeRooms), Times.Once);
     }
 
     [Fact]
@@ -225,7 +243,10 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
             RepositoryTestHelper.CreateTestRoom(isPublic: true),
             RepositoryTestHelper.CreateTestRoom(isPublic: true),
         };
+        var roomDtos = publicRooms.Select(r => new RoomDTO { Id = r.Id, IsPublic = true }).ToList();
+
         _roomRepositoryMock.Setup(r => r.GetPublicRoomsAsync()).ReturnsAsync(publicRooms);
+        _mockMapper.Setup(m => m.Map<IEnumerable<RoomDTO>>(publicRooms)).Returns(roomDtos);
 
         // Act
         var result = await _roomService.GetPublicRoomsAsync();
@@ -234,6 +255,7 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
         result.Should().HaveCount(2);
         result.Should().AllSatisfy(r => r.IsPublic.Should().BeTrue());
         _roomRepositoryMock.Verify(r => r.GetPublicRoomsAsync(), Times.Once);
+        _mockMapper.Verify(m => m.Map<IEnumerable<RoomDTO>>(publicRooms), Times.Once);
     }
 
     [Fact]
@@ -260,15 +282,20 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
         // Arrange
         var hostId = Guid.NewGuid();
         var room = RepositoryTestHelper.CreateTestRoom(hostId: hostId);
+        var roomDto = new RoomDTO { Id = room.Id, HostId = hostId };
+
         _roomRepositoryMock.Setup(r => r.GetByHostIdAsync(hostId)).ReturnsAsync(room);
+        _mockMapper.Setup(m => m.Map<RoomDTO>(room)).Returns(roomDto);
 
         // Act
         var result = await _roomService.GetRoomByHostIdAsync(hostId);
 
         // Assert
         result.Should().NotBeNull();
+        result!.Should().Be(roomDto);
         result!.HostId.Should().Be(hostId);
         _roomRepositoryMock.Verify(r => r.GetByHostIdAsync(hostId), Times.Once);
+        _mockMapper.Verify(m => m.Map<RoomDTO>(room), Times.Once);
     }
 
     [Fact]
@@ -304,6 +331,30 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
             MaxPlayers = 4,
             MinPlayers = 2,
         };
+        var roomFromMapper = new Room
+        {
+            HostId = createDto.HostId,
+            GameMode = createDto.GameMode,
+            GameState = "{}",
+        };
+        var resultDto = new RoomDTO
+        {
+            HostId = createDto.HostId,
+            Description = createDto.Description,
+        };
+
+        _mockMapper.Setup(m => m.Map<Room>(createDto)).Returns(roomFromMapper);
+        _mockMapper
+            .Setup(m => m.Map<RoomDTO>(It.IsAny<Room>()))
+            .Returns(
+                (Room r) =>
+                    new RoomDTO
+                    {
+                        Id = r.Id, // Use the ID from the actual room object
+                        HostId = r.HostId,
+                        Description = r.Description,
+                    }
+            );
 
         // Capture the Room instance created by the service
         Room? capturedRoom = null;
@@ -324,6 +375,9 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
         result.HostId.Should().Be(createDto.HostId);
 
         _roomRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Room>()), Times.Once);
+        _mockMapper.Verify(m => m.Map<Room>(createDto), Times.Once);
+        _mockMapper.Verify(m => m.Map<RoomDTO>(It.IsAny<Room>()), Times.Once);
+
         // Verify that RoomService *delegated* player creation to the game service
         _mockBlackjackGameService.Verify(
             s => s.PlayerJoinAsync(capturedRoom.Id, createDto.HostId),
@@ -353,13 +407,19 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
             MaxPlayers = 4,
             MinPlayers = 2,
         };
+        var roomFromMapper = new Room { GameMode = createDto.GameMode, GameState = "{}" };
+
+        // Setup the mapper to return a valid room object to avoid NullReferenceException
+        _mockMapper.Setup(m => m.Map<Room>(createDto)).Returns(roomFromMapper);
 
         _roomRepositoryMock
             .Setup(r => r.CreateAsync(It.IsAny<Room>()))
             .ThrowsAsync(new Exception("Database error")); // Simulate failure
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => _roomService.CreateRoomAsync(createDto));
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _roomService.CreateRoomAsync(createDto)
+        );
 
         _roomRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<Room>()), Times.Once);
         _roomPlayerRepositoryMock.Verify(r => r.CreateAsync(It.IsAny<RoomPlayer>()), Times.Never); // Should not be called
@@ -472,28 +532,22 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
             MaxPlayers = 8,
             MinPlayers = 3,
         };
+        var resultDto = new RoomDTO { Id = roomId, Description = "Updated Description" };
 
         _roomRepositoryMock.Setup(r => r.GetByIdAsync(roomId)).ReturnsAsync(existingRoom);
         _roomRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<Room>())).ReturnsAsync(existingRoom);
+        _mockMapper.Setup(m => m.Map<RoomDTO>(It.IsAny<Room>())).Returns(resultDto);
 
         // Act
         var result = await _roomService.UpdateRoomAsync(updateDto);
 
         // Assert
         result.Should().NotBeNull();
-        _roomRepositoryMock.Verify(
-            r =>
-                r.UpdateAsync(
-                    It.Is<Room>(room =>
-                        room.Id == roomId
-                        && room.IsPublic == false
-                        && room.Description == "Updated Description"
-                        && room.MaxPlayers == 8
-                        && room.MinPlayers == 3
-                    )
-                ),
-            Times.Once
-        );
+        result!.Id.Should().Be(roomId);
+        _mockMapper.Verify(m => m.Map(updateDto, existingRoom), Times.Once);
+        _mockMapper.Verify(m => m.Map<RoomDTO>(It.IsAny<Room>()), Times.Once);
+        _roomRepositoryMock.Verify(r => r.GetByIdAsync(roomId), Times.Once);
+        _roomRepositoryMock.Verify(r => r.UpdateAsync(existingRoom), Times.Once);
     }
 
     [Fact]
@@ -833,15 +887,18 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
             GameConfig = "", // No existing config
             StartedAt = null,
         };
+        var resultDto = new RoomDTO { Id = roomId };
 
         _roomRepositoryMock.Setup(r => r.GetByIdAsync(roomId)).ReturnsAsync(room);
         _roomPlayerRepositoryMock.Setup(r => r.GetPlayerCountInRoomAsync(roomId)).ReturnsAsync(1);
         _roomRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<Room>())).ReturnsAsync(room); // For the return DTO
+        _mockMapper.Setup(m => m.Map<RoomDTO>(It.IsAny<Room>())).Returns(resultDto);
 
         // Act
-        await _roomService.StartGameAsync(roomId, null);
+        var result = await _roomService.StartGameAsync(roomId, null);
 
         // Assert
+        result.Should().Be(resultDto);
         _mockBlackjackGameService.Verify(
             bs =>
                 bs.StartGameAsync(
@@ -871,15 +928,18 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
         };
         var customConfig = new BlackjackConfig { StartingBalance = 5000, MaxPlayers = 2 };
         var customConfigJson = JsonSerializer.Serialize(customConfig);
+        var resultDto = new RoomDTO { Id = roomId };
 
         _roomRepositoryMock.Setup(r => r.GetByIdAsync(roomId)).ReturnsAsync(room);
         _roomPlayerRepositoryMock.Setup(r => r.GetPlayerCountInRoomAsync(roomId)).ReturnsAsync(1);
         _roomRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<Room>())).ReturnsAsync(room); // For the return DTO
+        _mockMapper.Setup(m => m.Map<RoomDTO>(It.IsAny<Room>())).Returns(resultDto);
 
         // Act
-        await _roomService.StartGameAsync(roomId, customConfigJson);
+        var result = await _roomService.StartGameAsync(roomId, customConfigJson);
 
         // Assert
+        result.Should().Be(resultDto);
         _mockBlackjackGameService.Verify(
             bs =>
                 bs.StartGameAsync(
@@ -910,15 +970,18 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
             GameConfig = existingConfigJson, // Existing config in room
             StartedAt = null,
         };
+        var resultDto = new RoomDTO { Id = roomId };
 
         _roomRepositoryMock.Setup(r => r.GetByIdAsync(roomId)).ReturnsAsync(room);
         _roomPlayerRepositoryMock.Setup(r => r.GetPlayerCountInRoomAsync(roomId)).ReturnsAsync(1);
         _roomRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<Room>())).ReturnsAsync(room); // For the return DTO
+        _mockMapper.Setup(m => m.Map<RoomDTO>(It.IsAny<Room>())).Returns(resultDto);
 
         // Act
-        await _roomService.StartGameAsync(roomId, null); // No custom config provided
+        var result = await _roomService.StartGameAsync(roomId, null); // No custom config provided
 
         // Assert
+        result.Should().Be(resultDto);
         _mockBlackjackGameService.Verify(
             bs =>
                 bs.StartGameAsync(
@@ -1088,6 +1151,7 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
             _roomPlayerRepositoryMock.Object,
             _dbContext,
             _mockGameServices, // Empty game services
+            _mockMapper.Object,
             _loggerMock.Object
         );
 
@@ -1270,14 +1334,17 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
             maxPlayers: 6,
             gameMode: GameModes.Blackjack
         );
+        var resultDto = new RoomDTO { Id = roomId };
 
         _roomRepositoryMock.Setup(r => r.GetByIdAsync(roomId)).ReturnsAsync(room);
+        _mockMapper.Setup(m => m.Map<RoomDTO>(It.IsAny<Room>())).Returns(resultDto);
 
         // Act
         var result = await _roomService.JoinRoomAsync(roomId, userId);
 
         // Assert
         result.Should().NotBeNull();
+        result.Should().Be(resultDto);
         result.Id.Should().Be(roomId);
         _roomRepositoryMock.Verify(r => r.GetByIdAsync(roomId), Times.Once);
         _mockBlackjackGameService.Verify(s => s.PlayerJoinAsync(roomId, userId), Times.Once); // Game service is called
@@ -1365,14 +1432,17 @@ public class RoomServiceTest : IDisposable // Implement IDisposable for DbContex
         var roomId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var room = RepositoryTestHelper.CreateTestRoom(id: roomId, gameMode: GameModes.Blackjack);
+        var resultDto = new RoomDTO { Id = roomId };
 
         _roomRepositoryMock.Setup(r => r.GetByIdAsync(roomId)).ReturnsAsync(room);
+        _mockMapper.Setup(m => m.Map<RoomDTO>(It.IsAny<Room>())).Returns(resultDto);
 
         // Act
         var result = await _roomService.LeaveRoomAsync(roomId, userId);
 
         // Assert
         result.Should().NotBeNull();
+        result.Should().Be(resultDto);
         result.Id.Should().Be(roomId);
         _roomRepositoryMock.Verify(r => r.GetByIdAsync(roomId), Times.Once);
         _mockBlackjackGameService.Verify(s => s.PlayerLeaveAsync(roomId, userId), Times.Once); // Verify game service is called
