@@ -1,23 +1,28 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSSEListener, GameStateSetters } from '@/lib/sse/GameEventHandler';
 import { ChatEventData } from '@/lib/sse/GameEvents.types';
+import { Room, User, RoomPlayer, GameState, GameConfig } from '@/lib/types';
 
-export default function GameClient({ roomId }) {
+interface GameClientProps {
+  roomId: string;
+}
+
+export default function GameClient({ roomId }: GameClientProps) {
   const router = useRouter();
-  const [room, setRoom] = useState(null);
-  const [user, setUser] = useState(null);
-  const [roomPlayers, setRoomPlayers] = useState([]);
-  const [gameState, setGameState] = useState(null);
-  const [gameConfig, setGameConfig] = useState(null);
+  const [room, setRoom] = useState<Room | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [roomPlayers, setRoomPlayers] = useState<RoomPlayer[]>([]);
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
   const [messages, setMessages] = useState<ChatEventData[]>([]);
   const [chatMessage, setChatMessage] = useState('');
   const [betAmount, setBetAmount] = useState(10);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const eventSourceRef = useRef(null);
+  const [error, setError] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7069';
 
@@ -201,7 +206,7 @@ export default function GameClient({ roomId }) {
     }
   };
 
-  const handlePlayerAction = async (action, data = {}) => {
+  const handlePlayerAction = async (action: string, data: Record<string, any> = {}) => {
     if (!user) return;
 
     try {
@@ -265,7 +270,7 @@ export default function GameClient({ roomId }) {
     }
   };
 
-  const handleSendMessage = async (e) => {
+  const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim()) return;
 
@@ -309,7 +314,7 @@ export default function GameClient({ roomId }) {
   }
 
   const isHost = user && room && user.id === room.hostId;
-  const currentStage = gameState?.currentStage?.$type || gameState?.currentStage?.type || 'unknown';
+  const currentStage = gameState?.currentStage?.$type || 'unknown';
 
   // Game has not started if there's no stage or it's in 'init' stage
   const gameNotStarted = !gameState?.currentStage || currentStage === 'init' || currentStage === 'unknown';
@@ -357,7 +362,7 @@ export default function GameClient({ roomId }) {
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <p className="text-yellow-100/60 text-sm">Current Stage</p>
-                <p className="text-yellow-200 font-bold capitalize">{currentStage}</p>
+                <p className="text-yellow-200 font-bold capitalize">{currentStage.replace(/_/g, ' ')}</p>
               </div>
               <div>
                 <p className="text-yellow-100/60 text-sm">Your Balance</p>
@@ -419,7 +424,7 @@ export default function GameClient({ roomId }) {
                   )}
 
                   {/* Betting Deadline Timer */}
-                  {gameState?.currentStage?.deadline && (
+                  {gameState?.currentStage?.$type === 'betting' && gameState.currentStage.deadline && (
                     <div className="bg-red-900/20 border border-red-700 rounded-lg p-2 text-center">
                       <span className="text-red-300 text-sm">
                         Betting closes: {new Date(gameState.currentStage.deadline).toLocaleTimeString()}
@@ -480,22 +485,24 @@ export default function GameClient({ roomId }) {
                   </button>
 
                   {/* Show who has bet */}
-                  {gameState?.currentStage?.bets && Object.keys(gameState.currentStage.bets).length > 0 && (
-                    <div className="bg-green-900/20 border border-green-700 rounded-lg p-3">
-                      <p className="text-green-300 text-sm mb-2 font-semibold">Bets Placed:</p>
-                      <div className="space-y-1">
-                        {Object.entries(gameState.currentStage.bets).map(([playerId, amount]) => {
-                          const player = roomPlayers.find((p) => p.id === playerId);
-                          return (
-                            <div key={playerId} className="flex justify-between text-sm">
-                              <span className="text-green-200">{player?.userName || 'Player'}</span>
-                              <span className="text-green-400 font-bold">${Number(amount).toLocaleString()}</span>
-                            </div>
-                          );
-                        })}
+                  {gameState?.currentStage?.$type === 'betting' &&
+                    gameState.currentStage.bets &&
+                    Object.keys(gameState.currentStage.bets).length > 0 && (
+                      <div className="bg-green-900/20 border border-green-700 rounded-lg p-3">
+                        <p className="text-green-300 text-sm mb-2 font-semibold">Bets Placed:</p>
+                        <div className="space-y-1">
+                          {Object.entries(gameState.currentStage.bets).map(([playerId, amount]) => {
+                            const player = roomPlayers.find((p) => p.userId === playerId);
+                            return (
+                              <div key={playerId} className="flex justify-between text-sm">
+                                <span className="text-green-200">{player?.userName || 'Player'}</span>
+                                <span className="text-green-400 font-bold">${Number(amount).toLocaleString()}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </div>
               )}
 
