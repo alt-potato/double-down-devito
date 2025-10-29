@@ -17,10 +17,9 @@ export interface ChatEventData {
   timestamp: string;
 }
 
-// TODO: strong typing for state
-export interface GameStateUpdateEventData {
-  currentStage: any;
-}
+import { GameState } from '../types';
+
+export type GameStateUpdateEventData = Partial<GameState>;
 
 export interface PlayerActionEventData {
   playerId: string; // user guid

@@ -81,11 +81,14 @@ export default function GameClient({ roomId }: GameClientProps) {
 
         // Parse game state and config
         try {
-          const parsedState = JSON.parse(roomData.gameState);
-          console.log('[GameClient] Parsed game state:', parsedState);
-          console.log('[GameClient] Current stage:', parsedState?.currentStage);
-          console.log('[GameClient] Stage $type:', parsedState?.currentStage?.$type);
-          setGameState(parsedState);
+          const parsedJson = JSON.parse(roomData.gameState);
+          if (parsedJson) {
+            // The server sends the full state object with camelCase
+            console.log('[GameClient] Parsed game state:', parsedJson);
+            console.log('[GameClient] Current stage:', parsedJson?.currentStage);
+            console.log('[GameClient] Stage $type:', parsedJson?.currentStage?.$type);
+            setGameState(parsedJson);
+          }
         } catch (e) {
           console.error('Failed to parse game state:', e);
         }
@@ -190,11 +193,14 @@ export default function GameClient({ roomId }: GameClientProps) {
       setRoom(updatedRoom);
 
       if (updatedRoom.gameState) {
-        const parsedState = JSON.parse(updatedRoom.gameState);
-        console.log('[StartGame] Parsed game state:', parsedState);
-        console.log('[StartGame] Current stage:', parsedState?.currentStage);
-        console.log('[StartGame] Stage $type:', parsedState?.currentStage?.$type);
-        setGameState(parsedState);
+        const parsedJson = JSON.parse(updatedRoom.gameState);
+        if (parsedJson) {
+          // The server sends the full state object with camelCase
+          console.log('[StartGame] Parsed game state:', parsedJson);
+          console.log('[StartGame] Current stage:', parsedJson?.currentStage);
+          console.log('[StartGame] Stage $type:', parsedJson?.currentStage?.$type);
+          setGameState(parsedJson);
+        }
       } else {
         console.warn('[StartGame] No game state in response');
       }
@@ -314,10 +320,10 @@ export default function GameClient({ roomId }: GameClientProps) {
   }
 
   const isHost = user && room && user.id === room.hostId;
-  const currentStage = gameState?.currentStage?.$type || 'unknown';
+  const currentStage = gameState?.currentStage?.$type;
 
   // Game has not started if there's no stage or it's in 'init' stage
-  const gameNotStarted = !gameState?.currentStage || currentStage === 'init' || currentStage === 'unknown';
+  const gameNotStarted = !currentStage || currentStage === 'init';
 
   // Debug logging
   console.log('[GameClient] Render - gameState:', gameState);
@@ -362,7 +368,9 @@ export default function GameClient({ roomId }: GameClientProps) {
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <p className="text-yellow-100/60 text-sm">Current Stage</p>
-                <p className="text-yellow-200 font-bold capitalize">{currentStage.replace(/_/g, ' ')}</p>
+                <p className="text-yellow-200 font-bold capitalize">
+                  {gameNotStarted ? 'Not Started' : currentStage.replace(/_/g, ' ')}
+                </p>
               </div>
               <div>
                 <p className="text-yellow-100/60 text-sm">Your Balance</p>

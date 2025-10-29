@@ -8,6 +8,7 @@ import {
   DealerRevealEventData,
   PlayerRevealEventData,
 } from './GameEvents.types';
+import { GameState, Room, RoomPlayer, User } from '../types';
 
 /**
  * A map representing the set of functions necessary to update the current display state.
@@ -15,11 +16,11 @@ import {
  */
 export interface GameStateSetters {
   setMessages: React.Dispatch<React.SetStateAction<ChatEventData[]>>;
-  setRoomPlayers: React.Dispatch<React.SetStateAction<any[]>>;
-  setGameState: React.Dispatch<React.SetStateAction<any | null>>;
-  setRoom: React.Dispatch<React.SetStateAction<any | null>>;
+  setRoomPlayers: React.Dispatch<React.SetStateAction<RoomPlayer[]>>;
+  setGameState: React.Dispatch<React.SetStateAction<GameState | null>>;
+  setRoom: React.Dispatch<React.SetStateAction<Room | null>>;
   fetchRoomPlayers: () => Promise<void>;
-  user: any | null;
+  user: User | null;
 }
 
 const eventHandlers = {
@@ -30,11 +31,18 @@ const eventHandlers = {
     setMessages((prev) => [...prev, event]);
   },
   game_state_update: (event: GameStateUpdateEventData, { setGameState }: GameStateSetters) => {
-    console.log(`[SSE Event] Game state updated: ${event.currentStage}`);
+    console.log(`[SSE Event] Game state updated:`, event);
 
-    // update game state
-    // TODO: use strong typing for state
-    setGameState(event.currentStage);
+    // update game state by merging new stage into previous state
+    setGameState((prevState) => {
+      if (!prevState) {
+        return event as GameState;
+      }
+      return {
+        ...prevState,
+        ...event,
+      };
+    });
   },
   player_action: (event: PlayerActionEventData, { fetchRoomPlayers }: GameStateSetters) => {
     // TODO: use better type system for action data
