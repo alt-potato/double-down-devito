@@ -49,7 +49,13 @@ public class Program
         builder.Services.AddCorsPolicy();
         builder.Services.AddAuth(builder.Configuration, builder.Environment);
 
-        builder.Services.AddControllers();
+        builder
+            .Services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                // use js convention for json serialization instead of C#
+                options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+            });
 
         // configure Fluent autovalidation
         builder.Services.AddValidatorsFromAssemblyContaining<Program>();

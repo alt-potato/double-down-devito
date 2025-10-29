@@ -3,6 +3,7 @@ using Project.Api.DTOs;
 using Project.Api.Models.Games;
 using Project.Api.Repositories.Interface;
 using Project.Api.Services.Interface;
+using Project.Api.Utilities.Constants;
 using Project.Api.Utilities.Enums;
 
 namespace Project.Api.Utilities.Extensions;
@@ -87,13 +88,17 @@ public static class BlackjackCardExtensions
         this BlackjackState state,
         Guid roomId,
         IRoomRepository? roomRepository = null,
-        IRoomSSEService? roomSSEService = null
+        IRoomSSEService? roomSSEService = null,
+        JsonSerializerOptions? jsonOptions = null
     )
     {
         if (roomRepository is not null)
         {
             // save state
-            string updatedGameState = JsonSerializer.Serialize(state);
+            string updatedGameState = JsonSerializer.Serialize(
+                state,
+                jsonOptions ?? ApiJsonSerializerOptions.DefaultOptions
+            );
             await roomRepository.UpdateGameStateAsync(roomId, updatedGameState);
         }
 

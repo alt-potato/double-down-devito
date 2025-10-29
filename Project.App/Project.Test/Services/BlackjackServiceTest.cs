@@ -10,6 +10,7 @@ using Project.Api.Services.Interface;
 using Project.Api.Utilities;
 using Project.Api.Utilities.Constants;
 using Project.Api.Utilities.Enums;
+using static Project.Api.Utilities.Constants.ApiJsonSerializerOptions;
 
 namespace Project.Test.Services;
 
@@ -33,7 +34,7 @@ public class BlackjackServiceTest
         _userRepositoryMock = new Mock<IUserRepository>();
 
         var defaultConfig = new BlackjackConfig();
-        var defaultConfigString = JsonSerializer.Serialize(defaultConfig);
+        var defaultConfigString = JsonSerializer.Serialize(defaultConfig, DefaultOptions);
         _roomRepositoryMock
             .Setup(r => r.GetGameConfigAsync(It.IsAny<Guid>()))
             .ReturnsAsync(defaultConfigString);
@@ -52,7 +53,7 @@ public class BlackjackServiceTest
     private static JsonElement CreateBetActionData(long amount)
     {
         var betAction = new BetAction(amount);
-        var json = JsonSerializer.Serialize(betAction);
+        var json = JsonSerializer.Serialize(betAction, DefaultOptions);
         return JsonDocument.Parse(json).RootElement;
     }
 
@@ -87,7 +88,7 @@ public class BlackjackServiceTest
 
         var bettingStage = new BlackjackBettingStage(DateTimeOffset.UtcNow.AddMinutes(1), []);
         var gameState = new BlackjackState { CurrentStage = bettingStage };
-        var gameStateString = JsonSerializer.Serialize(gameState);
+        var gameStateString = JsonSerializer.Serialize(gameState, DefaultOptions);
         var room = new Room
         {
             Id = roomId,
@@ -123,9 +124,8 @@ public class BlackjackServiceTest
                 r.UpdateGameStateAsync(
                     roomId,
                     It.Is<string>(s =>
-                        JsonSerializer
-                            .Deserialize<BlackjackState>(s, (JsonSerializerOptions?)null)!
-                            .CurrentStage is BlackjackBettingStage
+                        JsonSerializer.Deserialize<BlackjackState>(s, DefaultOptions)!.CurrentStage
+                        is BlackjackBettingStage
                     )
                 ),
             Times.Once
@@ -169,7 +169,7 @@ public class BlackjackServiceTest
             new Dictionary<Guid, long> { { otherPlayer.Id, 50L } }
         );
         var gameState = new BlackjackState { CurrentStage = bettingStage };
-        var gameStateString = JsonSerializer.Serialize(gameState);
+        var gameStateString = JsonSerializer.Serialize(gameState, DefaultOptions);
 
         _roomRepositoryMock.Setup(r => r.GetGameStateAsync(roomId)).ReturnsAsync(gameStateString);
         _roomPlayerRepositoryMock
@@ -313,9 +313,8 @@ public class BlackjackServiceTest
                 r.UpdateGameStateAsync(
                     roomId,
                     It.Is<string>(s =>
-                        JsonSerializer
-                            .Deserialize<BlackjackState>(s, (JsonSerializerOptions?)null)!
-                            .CurrentStage is BlackjackPlayerActionStage
+                        JsonSerializer.Deserialize<BlackjackState>(s, DefaultOptions)!.CurrentStage
+                        is BlackjackPlayerActionStage
                     )
                 ),
             Times.Once

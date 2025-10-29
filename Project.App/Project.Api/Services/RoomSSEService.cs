@@ -4,6 +4,7 @@ using Project.Api.Models.Games;
 using Project.Api.Services.Interface;
 using Project.Api.Utilities.Enums;
 using Project.Api.Utilities.Extensions;
+using static Project.Api.Utilities.Constants.ApiJsonSerializerOptions;
 
 namespace Project.Api.Services;
 
@@ -15,11 +16,6 @@ public class RoomSSEService(ILogger<RoomSSEService> logger) : IRoomSSEService
         Guid,
         ConcurrentDictionary<string, StreamWriter>
     > _connections = new();
-
-    private readonly JsonSerializerOptions _jsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase, // use js convention instead of C#
-    };
 
     public async Task AddConnectionAsync(Guid roomId, HttpResponse response)
     {
@@ -74,7 +70,7 @@ public class RoomSSEService(ILogger<RoomSSEService> logger) : IRoomSSEService
             return;
         }
 
-        string serializedData = JsonSerializer.Serialize(data, data.GetType(), _jsonOptions);
+        string serializedData = JsonSerializer.Serialize(data, data.GetType(), DefaultOptions);
         string eventName = eventType.ToString().ToSnakeCase(); // use snake_case event type
 
         _logger.LogInformation(

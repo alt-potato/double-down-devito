@@ -8,6 +8,7 @@ using Project.Api.Utilities;
 using Project.Api.Utilities.Constants;
 using Project.Api.Utilities.Enums;
 using Project.Api.Utilities.Extensions;
+using static Project.Api.Utilities.Constants.ApiJsonSerializerOptions;
 
 namespace Project.Api.Services;
 
@@ -97,7 +98,8 @@ public class BlackjackService(
         if (string.IsNullOrWhiteSpace(configString))
             return new BlackjackConfig();
 
-        return JsonSerializer.Deserialize<BlackjackConfig>(configString) ?? new BlackjackConfig();
+        return JsonSerializer.Deserialize<BlackjackConfig>(configString, DefaultOptions)
+            ?? new BlackjackConfig();
     }
 
     public async Task SetConfigAsync(Guid gameId, GameConfig inputConfig)
@@ -105,7 +107,7 @@ public class BlackjackService(
         if (inputConfig is not BlackjackConfig config)
             throw new ArgumentException("Config must be of type BlackjackConfig.");
 
-        string configString = JsonSerializer.Serialize(config);
+        string configString = JsonSerializer.Serialize(config, DefaultOptions);
         await _roomRepository.UpdateGameConfigAsync(gameId, configString);
     }
 
@@ -113,7 +115,7 @@ public class BlackjackService(
     {
         string stateString = await _roomRepository.GetGameStateAsync(roomId);
 
-        return JsonSerializer.Deserialize<BlackjackState>(stateString)
+        return JsonSerializer.Deserialize<BlackjackState>(stateString, DefaultOptions)
             ?? throw new InternalServerException("Failed to deserialize game state.");
     }
 
@@ -162,10 +164,10 @@ public class BlackjackService(
             await _roomRepository.GetByIdAsync(roomId)
             ?? throw new NotFoundException($"Room {roomId} not found.");
 
-        room.GameConfig = JsonSerializer.Serialize(config);
+        room.GameConfig = JsonSerializer.Serialize(config, DefaultOptions);
         room.StartedAt = DateTimeOffset.UtcNow;
         room.DeckId = deckId;
-        room.GameState = JsonSerializer.Serialize(initialState);
+        room.GameState = JsonSerializer.Serialize(initialState, DefaultOptions);
         room.IsActive = true;
         room.Round = 1;
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Project.Api.Utilities.Constants;
 
 namespace Project.Api.DTOs;
 
@@ -23,26 +24,35 @@ public record HurryUpAction : BlackjackActionDTO;
 
 public static class JsonElementExtensions
 {
+    private static readonly Dictionary<string, Type> BlackjackActionTypeMap = new()
+    {
+        { "bet", typeof(BetAction) },
+        { "hit", typeof(HitAction) },
+        { "stand", typeof(StandAction) },
+        { "double", typeof(DoubleAction) },
+        { "split", typeof(SplitAction) },
+        { "surrender", typeof(SurrenderAction) },
+        { "hurry_up", typeof(HurryUpAction) },
+    };
+
     /// <summary>
     /// Extension method to deserialize a <see cref="BlackjackActionDTO"/> from a <see cref="JsonElement"/>.
     /// Any errors thrown during deserialization will be passed to the caller.
     /// </summary>
     public static BlackjackActionDTO ToBlackjackAction(this JsonElement element, string action)
     {
-        return (
-                action switch
-                {
-                    "bet" => element.Deserialize<BetAction>(),
-                    "hit" => element.Deserialize<HitAction>(),
-                    "stand" => element.Deserialize<StandAction>(),
-                    "double" => element.Deserialize<DoubleAction>(),
-                    "split" => element.Deserialize<SplitAction>(),
-                    "surrender" => (BlackjackActionDTO?)element.Deserialize<SurrenderAction>(),
-                    "hurry_up" => element.Deserialize<HurryUpAction>(),
-                    _ => throw new NotSupportedException(
-                        $"Action '{action}' is not a valid action for Blackjack."
-                    ),
-                }
-            ) ?? throw new InvalidOperationException($"Could not deserialize action {action}.");
+        if (!BlackjackActionTypeMap.TryGetValue(action, out var actionType))
+        {
+            throw new NotSupportedException(
+                $"Action '{action}' is not a valid action for Blackjack."
+            );
+        }
+
+        var deserializedAction = element.Deserialize(actionType, ApiJsonSerializerOptions.DefaultOptions);
+
+        return (BlackjackActionDTO)(
+            deserializedAction
+            ?? throw new InvalidOperationException($"Could not deserialize action {action}.")
+        );
     }
 }

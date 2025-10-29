@@ -27,6 +27,7 @@ public abstract class IntegrationTestBase(WebApplicationFactory<Program> factory
 
     protected static readonly JsonSerializerOptions _jsonOptions = new()
     {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
         Converters = { new FlexibleEnumConverterFactory() },
     };
