@@ -33,9 +33,8 @@ const eventHandlers = {
     console.log(`[SSE Event] Game state updated: ${event.currentStage}`);
 
     // update game state
-    // TODO: use strong typing for state parsing
-    const parsedState = JSON.parse(event.currentStage);
-    setGameState(parsedState);
+    // TODO: use strong typing for state
+    setGameState(event.currentStage);
   },
   player_action: (event: PlayerActionEventData, { fetchRoomPlayers }: GameStateSetters) => {
     // TODO: use better type system for action data

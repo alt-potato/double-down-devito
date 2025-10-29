@@ -19,7 +19,7 @@ export interface ChatEventData {
 
 // TODO: strong typing for state
 export interface GameStateUpdateEventData {
-  currentStage: string;
+  currentStage: any;
 }
 
 export interface PlayerActionEventData {
