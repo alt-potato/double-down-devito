@@ -3,8 +3,18 @@ const nextConfig = {
   // output: 'export', // Commented out to support dynamic routes like /player/[id]
 
   images: {
-    domains: ['www.shutterstock.com', 'lh3.googleusercontent.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'www.shutterstock.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+    ],
   },
+  turbopack: {},
   // Disable SSL certificate validation in development
   // WARNING: Only use this in development, never in production
   webpack: (config, { isServer }) => {
