@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Project.Api.Utilities.Constants;
+using static Project.Api.Utilities.Constants.ApiJsonSerializerOptions;
 
 namespace Project.Api.DTOs;
 
@@ -48,7 +48,7 @@ public static class JsonElementExtensions
             );
         }
 
-        var deserializedAction = element.Deserialize(actionType, ApiJsonSerializerOptions.DefaultOptions);
+        var deserializedAction = element.Deserialize(actionType, DefaultOptions);
 
         return (BlackjackActionDTO)(
             deserializedAction
