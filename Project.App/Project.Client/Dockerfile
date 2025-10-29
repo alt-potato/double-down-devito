@@ -35,14 +35,15 @@ FROM node:24-alpine AS run
 # set working directory
 WORKDIR /src/app
 
+# install dependencies (without dev deps)
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
 # copy built files from build
 COPY --from=build /src/app/.next ./.next
 # copy static files
 COPY --from=build /src/app/public ./public 
 
-# install dependencies (without dev deps)
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
 # run! (on node server)
+EXPOSE 3000
 CMD ["npm", "run", "start"]
