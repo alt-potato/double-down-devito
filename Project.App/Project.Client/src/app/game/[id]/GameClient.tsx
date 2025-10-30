@@ -6,6 +6,7 @@ import { createSSEListener, GameStateSetters } from '@/lib/sse/GameEventHandler'
 import { Room, User, RoomPlayer, GameConfig } from '@/lib/types/core';
 import { ChatEventData } from '@/lib/types/events';
 import { GameState } from '@/lib/types/game';
+import { getGameHandler } from '@/lib/game/GameRegistry';
 
 interface GameClientProps {
   roomId: string;
@@ -20,7 +21,6 @@ export default function GameClient({ roomId }: GameClientProps) {
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
   const [messages, setMessages] = useState<ChatEventData[]>([]);
   const [chatMessage, setChatMessage] = useState('');
-  const [betAmount, setBetAmount] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -97,7 +97,6 @@ export default function GameClient({ roomId }: GameClientProps) {
         try {
           const parsedConfig = JSON.parse(roomData.gameConfig);
           setGameConfig(parsedConfig);
-          setBetAmount(parsedConfig.minBet || 10);
         } catch (e) {
           console.error('Failed to parse game config:', e);
         }
@@ -242,17 +241,6 @@ export default function GameClient({ roomId }: GameClientProps) {
     }
   };
 
-  const handlePlaceBet = () => {
-    handlePlayerAction('bet', { amount: betAmount });
-  };
-
-  const handleHit = () => {
-    handlePlayerAction('hit', {});
-  };
-
-  const handleStand = () => {
-    handlePlayerAction('stand', {});
-  };
 
   const handleLeaveRoom = async () => {
     if (!user) return;
@@ -323,13 +311,19 @@ export default function GameClient({ roomId }: GameClientProps) {
   const isHost = user && room && user.id === room.hostId;
   const currentStage = gameState?.currentStage?.$type;
 
-  // Game has not started if there's no stage or it's in 'init' stage
-  const gameNotStarted = !currentStage || currentStage === 'init';
+  // Game has not started if there's no stage or it's in 'not_started' stage
+  const gameNotStarted = !currentStage || currentStage === 'not_started';
+
+  // Get the appropriate game handler
+  const gameHandler = room ? getGameHandler(room.gameMode) : null;
 
   // Debug logging
   console.log('[GameClient] Render - gameState:', gameState);
   console.log('[GameClient] Render - currentStage:', currentStage);
   console.log('[GameClient] Render - gameNotStarted:', gameNotStarted);
+  console.log('[GameClient] Render - isHost:', isHost);
+  console.log('[GameClient] Render - gameMode:', room?.gameMode);
+  console.log('[GameClient] Render - gameHandler:', gameHandler);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 p-4 md:p-8">
@@ -337,7 +331,9 @@ export default function GameClient({ roomId }: GameClientProps) {
       <div className="bg-black/80 border-2 border-yellow-600 rounded-xl p-4 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-yellow-400">{room?.description || 'Blackjack Table'}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-yellow-400">
+              {room?.description || (gameHandler ? gameHandler.getGameTitle() : 'Game Table')}
+            </h1>
             <p className="text-yellow-100/60 text-sm font-mono">Room ID: {roomId.substring(0, 8)}...</p>
           </div>
           <div className="flex items-center gap-4">
@@ -362,15 +358,18 @@ export default function GameClient({ roomId }: GameClientProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Main Game Area */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Game State */}
+      <div className="lg:col-span-2 space-y-4">
+        {/* Game State - Use dynamic game handler if available */}
+        {gameHandler && gameState && !gameNotStarted ? (
+          gameHandler.renderGameArea(gameState, gameConfig, roomPlayers, user)
+        ) : (
           <div className="bg-black/80 border-2 border-yellow-600 rounded-xl p-6">
             <h2 className="text-xl font-bold text-yellow-400 mb-4">Game Status</h2>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <p className="text-yellow-100/60 text-sm">Current Stage</p>
                 <p className="text-yellow-200 font-bold capitalize">
-                  {gameNotStarted ? 'Not Started' : currentStage.replace(/_/g, ' ')}
+                  {gameNotStarted ? 'Not Started' : currentStage?.replace(/_/g, ' ') || 'Unknown'}
                 </p>
               </div>
               <div>
@@ -412,128 +411,18 @@ export default function GameClient({ roomId }: GameClientProps) {
               </div>
             )}
           </div>
+        )}
 
-          {/* Player Actions */}
+          {/* Player Actions - Use dynamic game handler if available */}
           {room?.isActive && !gameNotStarted && (
             <div className="bg-black/80 border-2 border-yellow-600 rounded-xl p-6">
               <h2 className="text-xl font-bold text-yellow-400 mb-4">Player Actions</h2>
-
-              {currentStage === 'betting' && (
-                <div className="space-y-4">
-                  {/* Player Balance */}
-                  {roomPlayers.find((p) => p.userId === user?.id) && (
-                    <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-yellow-100/80">Your Balance:</span>
-                        <span className="text-yellow-400 font-bold text-xl">
-                          ${roomPlayers.find((p) => p.userId === user?.id)?.balance || 0}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Betting Deadline Timer */}
-                  {gameState?.currentStage?.$type === 'betting' && gameState.currentStage.deadline && (
-                    <div className="bg-red-900/20 border border-red-700 rounded-lg p-2 text-center">
-                      <span className="text-red-300 text-sm">
-                        Betting closes: {new Date(gameState.currentStage.deadline).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Bet Amount Input */}
-                  <div>
-                    <label className="block text-yellow-100 mb-2 font-semibold">
-                      Bet Amount (Min: ${gameConfig?.minBet || 10})
-                    </label>
-                    <input
-                      type="number"
-                      value={betAmount}
-                      onChange={(e) => setBetAmount(parseInt(e.target.value))}
-                      min={gameConfig?.minBet || 10}
-                      step="10"
-                      max={roomPlayers.find((p) => p.userId === user?.id)?.balance || 1000}
-                      className="w-full px-4 py-2 rounded bg-black/60 border border-yellow-700 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                    />
-                  </div>
-
-                  {/* Quick Bet Buttons */}
-                  <div className="grid grid-cols-4 gap-2">
-                    <button
-                      onClick={() => setBetAmount(gameConfig?.minBet || 10)}
-                      className="py-2 px-3 bg-yellow-900/40 hover:bg-yellow-900/60 border border-yellow-700 text-yellow-300 rounded text-sm font-semibold transition"
-                    >
-                      Min
-                    </button>
-                    <button
-                      onClick={() => setBetAmount((gameConfig?.minBet || 10) * 2)}
-                      className="py-2 px-3 bg-yellow-900/40 hover:bg-yellow-900/60 border border-yellow-700 text-yellow-300 rounded text-sm font-semibold transition"
-                    >
-                      2x
-                    </button>
-                    <button
-                      onClick={() => setBetAmount((gameConfig?.minBet || 10) * 5)}
-                      className="py-2 px-3 bg-yellow-900/40 hover:bg-yellow-900/60 border border-yellow-700 text-yellow-300 rounded text-sm font-semibold transition"
-                    >
-                      5x
-                    </button>
-                    <button
-                      onClick={() => setBetAmount(roomPlayers.find((p) => p.userId === user?.id)?.balance || 1000)}
-                      className="py-2 px-3 bg-yellow-900/40 hover:bg-yellow-900/60 border border-yellow-700 text-yellow-300 rounded text-sm font-semibold transition"
-                    >
-                      All In
-                    </button>
-                  </div>
-
-                  {/* Place Bet Button */}
-                  <button
-                    onClick={handlePlaceBet}
-                    className="w-full py-3 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-black font-bold rounded-lg hover:from-yellow-500 hover:to-yellow-700 transition-all duration-200 border-2 border-yellow-700 shadow-md"
-                  >
-                    Place Bet ${betAmount}
-                  </button>
-
-                  {/* Show who has bet */}
-                  {gameState?.currentStage?.$type === 'betting' &&
-                    gameState.currentStage.bets &&
-                    Object.keys(gameState.currentStage.bets).length > 0 && (
-                      <div className="bg-green-900/20 border border-green-700 rounded-lg p-3">
-                        <p className="text-green-300 text-sm mb-2 font-semibold">Bets Placed:</p>
-                        <div className="space-y-1">
-                          {Object.entries(gameState.currentStage.bets).map(([playerId, amount]) => {
-                            const player = roomPlayers.find((p) => p.userId === playerId);
-                            return (
-                              <div key={playerId} className="flex justify-between text-sm">
-                                <span className="text-green-200">{player?.userName || 'Player'}</span>
-                                <span className="text-green-400 font-bold">${Number(amount).toLocaleString()}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                </div>
-              )}
-
-              {currentStage === 'player_action' && (
-                <div className="flex gap-4">
-                  <button
-                    onClick={handleHit}
-                    className="flex-1 py-3 bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 text-white font-bold rounded-lg hover:from-blue-500 hover:to-blue-700 transition-all duration-200 border-2 border-blue-700 shadow-md"
-                  >
-                    Hit
-                  </button>
-                  <button
-                    onClick={handleStand}
-                    className="flex-1 py-3 bg-gradient-to-r from-red-400 via-red-500 to-red-600 text-white font-bold rounded-lg hover:from-red-500 hover:to-red-700 transition-all duration-200 border-2 border-red-700 shadow-md"
-                  >
-                    Stand
-                  </button>
-                </div>
-              )}
-
-              {!['betting', 'player_action'].includes(currentStage) && (
-                <p className="text-yellow-100/60 text-center">Waiting for game to progress...</p>
+              {gameHandler && gameState ? (
+                gameHandler.renderPlayerActions(gameState, gameConfig, handlePlayerAction, user, roomPlayers)
+              ) : (
+                <p className="text-yellow-100/60 text-center">
+                  {gameHandler ? 'No actions available' : `Game mode "${room?.gameMode}" not supported`}
+                </p>
               )}
             </div>
           )}

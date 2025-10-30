@@ -1,50 +1,19 @@
-// for reference:
-// Project.App/Project.Api/Models/Games/BlackjackState.cs
+// base types for game states
 
-export interface BlackjackInitStage {
-  $type: 'init';
+export interface GameStage {
+  $type: string;
 }
-
-export interface BlackjackSetupStage {
-  $type: 'setup';
-}
-
-export interface BlackjackBettingStage {
-  $type: 'betting';
-  deadline: string;
-  bets: Record<string, number>;
-}
-
-export interface BlackjackDealingStage {
-  $type: 'dealing';
-}
-
-export interface BlackjackPlayerActionStage {
-  $type: 'player_action';
-  deadline: string;
-  playerIndex: number;
-  handIndex: number;
-}
-
-export interface BlackjackFinishRoundStage {
-  $type: 'finish_round';
-}
-
-export interface BlackjackTeardownStage {
-  $type: 'teardown';
-}
-
-export type BlackjackStage =
-  | BlackjackInitStage
-  | BlackjackSetupStage
-  | BlackjackBettingStage
-  | BlackjackDealingStage
-  | BlackjackPlayerActionStage
-  | BlackjackFinishRoundStage
-  | BlackjackTeardownStage;
 
 export interface GameState {
-  dealerHand: string;
-  bets: Record<string, number>;
-  currentStage: BlackjackStage;
+  currentStage: GameStage;
+}
+
+// abstract game handler interface
+export interface GameHandler {
+  renderGameArea: (gameState: GameState, gameConfig: any, roomPlayers: any[], user: any) => React.ReactElement;
+  renderPlayerActions: (gameState: GameState, gameConfig: any, onAction: (action: string, data: any) => void, user: any, roomPlayers: any[]) => React.ReactElement;
+  parseGameState: (rawState: string) => GameState;
+  parseGameConfig: (rawConfig: string) => any;
+  getSupportedActions: (gameState: GameState) => string[];
+  getGameTitle: () => string;
 }
