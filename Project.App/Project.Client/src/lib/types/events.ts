@@ -1,7 +1,6 @@
 // for reference:
 // Project.App/Project.Api/DTOs/CardDTO.cs
 // Project.App/Project.Api/Models/Games/RoomEvents.cs
-// Project.App/Project.Api/Models/Games/BlackjackState.cs
 
 export interface Card {
   code: string;
@@ -17,9 +16,7 @@ export interface ChatEventData {
   timestamp: string;
 }
 
-import { GameState } from '../types';
-
-export type GameStateUpdateEventData = Partial<GameState>;
+export type GameStateUpdateEventData = Partial<import('./game').GameState>;
 
 export interface PlayerActionEventData {
   playerId: string; // user guid

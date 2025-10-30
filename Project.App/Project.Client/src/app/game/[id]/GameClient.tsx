@@ -3,8 +3,9 @@
 import { useEffect, useState, useRef, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSSEListener, GameStateSetters } from '@/lib/sse/GameEventHandler';
-import { ChatEventData } from '@/lib/sse/GameEvents.types';
-import { Room, User, RoomPlayer, GameState, GameConfig } from '@/lib/types';
+import { Room, User, RoomPlayer, GameConfig } from '@/lib/types/core';
+import { ChatEventData } from '@/lib/types/events';
+import { GameState } from '@/lib/types/game';
 
 interface GameClientProps {
   roomId: string;

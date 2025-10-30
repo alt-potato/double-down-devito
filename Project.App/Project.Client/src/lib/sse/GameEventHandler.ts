@@ -7,8 +7,9 @@ import {
   HostChangeEventData,
   DealerRevealEventData,
   PlayerRevealEventData,
-} from './GameEvents.types';
-import { GameState, Room, RoomPlayer, User } from '../types';
+} from '@/lib/types/events';
+import { GameState } from '@/lib/types/game';
+import { Room, RoomPlayer, User } from '@/lib/types/core';
 
 /**
  * A map representing the set of functions necessary to update the current display state.
