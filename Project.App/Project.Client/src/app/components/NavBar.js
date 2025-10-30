@@ -2,9 +2,43 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 
 export default function NavBar() {
   const pathname = usePathname();
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7069';
+
+  // Fetch current user data
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/user/me`, {
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          setCurrentUserId(userData.id);
+        } else {
+          console.error('[NavBar] Failed to fetch current user');
+        }
+      } catch (error) {
+        console.error('[NavBar] Error fetching current user:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Only fetch user data on protected pages
+    if (pathname.startsWith('/player/') || pathname.startsWith('/rooms') || pathname.startsWith('/game/')) {
+      fetchCurrentUser();
+    } else {
+      setIsLoading(false);
+    }
+  }, [pathname, API_URL]);
 
   const handleLogout = async () => {
     console.log('[NavBar] Logout clicked');
@@ -35,15 +69,16 @@ export default function NavBar() {
     }
   };
 
-  let links = [
-    // TODO: Replace '/player/1' with the real logged-in player's id when auth is wired up
-    // { href: '/player/1', label: 'Profile' },
-    // { href: '/rooms', label: 'Rooms'},
-  ];
+  let links = [];
+  
+  // Show navigation links immediately based on current path
+  // The Profile link will be updated with the correct user ID once loaded
   if (pathname.startsWith('/player/')) {
     links = [{ href: '/rooms', label: 'Rooms' }];
   } else if (pathname.startsWith('/rooms')) {
-    links = [{ href: '/player/1', label: 'Profile' }];
+    // Show Profile link immediately, but use placeholder until user data loads
+    const profileHref = currentUserId && !isLoading ? `/player/${currentUserId}` : '#';
+    links = [{ href: profileHref, label: 'Profile' }];
   } else if (pathname.startsWith('/game/')) {
     // No additional links in game view - leave button is in the game UI
     links = [];
