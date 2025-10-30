@@ -408,7 +408,6 @@ public class BlackjackService(
 
                 // next player or next stage
                 await NextHandOrFinishRoundAsync(state, roomId);
-                // throw new NotImplementedException(); // This line should be removed if DoDoubleAsync is fully implemented
                 break;
             case SplitAction splitAction:
                 await DoSplitAsync(state, roomId, player, splitAction.Amount);
