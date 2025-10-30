@@ -1,12 +1,10 @@
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
 using Project.Api;
 using Project.Api.Data;
 using Project.Api.DTOs;
@@ -18,7 +16,6 @@ using Project.Api.Utilities.Constants;
 using Project.Api.Utilities.Enums;
 using Project.Api.Utilities.Extensions;
 using Project.Test.Helpers;
-using Xunit;
 
 namespace Project.Test.Integration;
 
@@ -180,6 +177,15 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
         createdRoom.Should().NotBeNull();
         createdRoom!.Id.Should().NotBeEmpty();
         createdRoom!.HostId.Should().Be(player0Id);
+        createdRoom!.GameMode.Should().Be(GameModes.Blackjack);
+        createdRoom!.IsActive.Should().BeTrue();
+        // game state should be in not started state
+        var notStartedState = JsonSerializer.Deserialize<BlackjackState>(
+            createdRoom!.GameState,
+            _jsonOptions
+        );
+        notStartedState.Should().NotBeNull();
+        notStartedState!.CurrentStage.Should().BeOfType<BlackjackNotStartedStage>();
 
         // ASSERT: room exists
         var roomId = createdRoom!.Id;

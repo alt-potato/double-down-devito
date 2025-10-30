@@ -102,6 +102,28 @@ public class BlackjackService(
             ?? new BlackjackConfig();
     }
 
+    public string GetInitialStateAsync() =>
+        JsonSerializer.Serialize(
+            new BlackjackState() { CurrentStage = new BlackjackNotStartedStage() },
+            DefaultOptions
+        );
+
+    public async Task<IGameState> TeardownGameAsync(Guid gameId)
+    {
+        // Get current game state
+        var state =
+            await GetGameStateAsync(gameId) as BlackjackState
+            ?? throw new InternalServerException("Failed to get game state for teardown.");
+
+        // Transition to teardown stage
+        state.CurrentStage = new BlackjackTeardownStage();
+
+        // Save the teardown state
+        await state.SaveStateAndBroadcastAsync(gameId, _roomRepository, _roomSSEService);
+
+        return state;
+    }
+
     public async Task SetConfigAsync(Guid gameId, GameConfig inputConfig)
     {
         if (inputConfig is not BlackjackConfig config)
@@ -138,7 +160,7 @@ public class BlackjackService(
             throw new ArgumentException("Config must be of type BlackjackConfig.");
 
         // create initial game state
-        BlackjackState initialState = new()
+        BlackjackState initState = new()
         {
             CurrentStage = new BlackjackBettingStage(
                 DateTimeOffset.UtcNow + config.BettingTimeLimit,
@@ -167,14 +189,14 @@ public class BlackjackService(
         room.GameConfig = JsonSerializer.Serialize(config, DefaultOptions);
         room.StartedAt = DateTimeOffset.UtcNow;
         room.DeckId = deckId;
-        room.GameState = JsonSerializer.Serialize(initialState, DefaultOptions);
+        room.GameState = JsonSerializer.Serialize(initState, DefaultOptions);
         room.IsActive = true;
         room.Round = 1;
 
         await _roomRepository.UpdateAsync(room);
 
         // broadcast initial game state, do not save (since it's already saved)
-        await initialState.SaveStateAndBroadcastAsync(roomId, roomSSEService: _roomSSEService);
+        await initState.SaveStateAndBroadcastAsync(roomId, roomSSEService: _roomSSEService);
     }
 
     public async Task PlayerJoinAsync(Guid roomId, Guid playerId)

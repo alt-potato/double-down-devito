@@ -75,13 +75,15 @@ public class RoomService(
         Room room = _mapper.Map<Room>(dto);
 
         room.Id = Guid.CreateVersion7();
-        room.GameState = "{}";
         room.CreatedAt = DateTimeOffset.UtcNow;
         room.DeckId = string.Empty;
         room.IsActive = true;
 
         // Get the game service for the room's game mode
         var gameService = GetGameService(room.GameMode);
+
+        // Initialize proper game state using the game service
+        room.GameState = gameService.GetInitialStateAsync();
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync();
         try

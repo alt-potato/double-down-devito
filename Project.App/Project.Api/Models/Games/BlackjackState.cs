@@ -8,6 +8,7 @@ public record BlackjackState : GameState<BlackjackStage>
     public Dictionary<Guid, long> Bets { get; set; } = [];
 }
 
+[JsonDerivedType(typeof(BlackjackNotStartedStage), typeDiscriminator: "not_started")]
 [JsonDerivedType(typeof(BlackjackInitStage), typeDiscriminator: "init")]
 [JsonDerivedType(typeof(BlackjackSetupStage), typeDiscriminator: "setup")]
 [JsonDerivedType(typeof(BlackjackBettingStage), typeDiscriminator: "betting")]
@@ -16,6 +17,9 @@ public record BlackjackState : GameState<BlackjackStage>
 [JsonDerivedType(typeof(BlackjackFinishRoundStage), typeDiscriminator: "finish_round")]
 [JsonDerivedType(typeof(BlackjackTeardownStage), typeDiscriminator: "teardown")]
 public abstract record BlackjackStage : GameStage;
+
+// game not started, waiting for players
+public record BlackjackNotStartedStage : BlackjackStage;
 
 // initial setup
 // initialize deck, set game configs

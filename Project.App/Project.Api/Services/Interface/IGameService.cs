@@ -17,6 +17,18 @@ public interface IGameService<TState, TConfig>
     /// </summary>
     string GameMode { get; }
 
+    /// <summary>
+    /// Returns the expected initial state of the game, for the initial setup of the room.
+    /// All games must have an initial waiting state.
+    /// </summary>
+    string GetInitialStateAsync();
+
+    /// <summary>
+    /// Transitions the game to the teardown stage for cleanup.
+    /// All games must support a teardown stage for proper cleanup.
+    /// </summary>
+    Task<TState> TeardownGameAsync(Guid gameId);
+
     Task<TConfig> GetConfigAsync(Guid gameId);
 
     Task SetConfigAsync(Guid gameId, TConfig config);
