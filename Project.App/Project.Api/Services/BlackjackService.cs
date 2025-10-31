@@ -163,8 +163,7 @@ public class BlackjackService(
         BlackjackState initState = new()
         {
             CurrentStage = new BlackjackBettingStage(
-                DateTimeOffset.UtcNow + config.BettingTimeLimit,
-                []
+                DateTimeOffset.UtcNow + config.BettingTimeLimit
             ),
         };
 
@@ -369,7 +368,7 @@ public class BlackjackService(
                 [
                     .. await _roomPlayerRepository.GetByRoomIdAsync(roomId),
                 ];
-                Dictionary<Guid, long> bets = bettingStage.Bets;
+                Dictionary<Guid, long> bets = state.Bets;
                 if (
                     players
                         .Where(p => p.Status == Status.Active || p.Status == Status.Away)
@@ -538,10 +537,8 @@ public class BlackjackService(
             );
         }
 
-        BlackjackBettingStage stage = (BlackjackBettingStage)state.CurrentStage;
-
         // set bet in gamestate
-        stage.Bets[player.Id] = bet;
+        state.Bets[player.Id] = bet;
 
         // update player status
         player.Status = Status.Active;
@@ -574,7 +571,7 @@ public class BlackjackService(
             ?? throw new InternalServerException("Failed to get game config.");
 
         // get bets
-        Dictionary<Guid, long> bets = ((BlackjackBettingStage)state.CurrentStage).Bets;
+        Dictionary<Guid, long> bets = state.Bets;
 
         // move to dealing stage
         state.CurrentStage = new BlackjackDealingStage();
@@ -652,9 +649,12 @@ public class BlackjackService(
             ); // no hidden cards for players
         }
 
-        // broadcast dealer's visible card (hide second card)
-        List<CardDTO> dealerHandCards = await _deckApiService.ListHand(deckId, "dealer");
-        await dealerHandCards.BroadcastAsync(_roomSSEService, roomId, hiddenIndices: [1]);
+        // set and broadcast dealer's visible card (hide second card)
+        List<CardDTO> dealerDisplayCards = (
+            await _deckApiService.ListHand(deckId, "dealer")
+        ).HideCards(1);
+        await dealerDisplayCards.BroadcastAsync(_roomSSEService, roomId);
+        state.DealerHand = dealerDisplayCards;
 
         // move to player action stage
         state.CurrentStage = new BlackjackPlayerActionStage(
@@ -1052,8 +1052,9 @@ public class BlackjackService(
             );
         }
 
-        // broadcast final dealer hand (do not hide any cards)
+        // set andbroadcast final dealer hand (do not hide any cards)
         await dealerHand.BroadcastAsync(_roomSSEService, roomId);
+        state.DealerHand = dealerHand;
 
         // calculate winnings for each player hand
         List<Hand> hands =
@@ -1118,9 +1119,10 @@ public class BlackjackService(
         }
 
         // initialize next betting stage
+        state.DealerHand = [];
+        state.Bets = [];
         state.CurrentStage = new BlackjackBettingStage(
-            DateTimeOffset.UtcNow + config.BettingTimeLimit,
-            []
+            DateTimeOffset.UtcNow + config.BettingTimeLimit
         );
         await state.SaveStateAndBroadcastAsync(roomId, _roomRepository, _roomSSEService);
 

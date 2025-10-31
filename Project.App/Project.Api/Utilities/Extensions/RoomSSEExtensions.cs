@@ -8,6 +8,20 @@ namespace Project.Api.Utilities.Extensions;
 public static class RoomSSEExtensions
 {
     /// <summary>
+    /// Hides the cards at the given indices. Does not modify the original list.
+    /// </summary>
+    public static List<CardDTO> HideCards(this List<CardDTO> cards, params int[] hiddenIndices)
+    {
+        return
+        [
+            .. cards.Select(
+                (card, index) =>
+                    hiddenIndices.Contains(index) ? new CardDTO { IsFaceDown = true } : card
+            ),
+        ];
+    }
+
+    /// <summary>
     /// Broadcasts a hand of cards to the room using the given SSE service, optionally hiding certain cards.
     /// </summary>
     public static async Task BroadcastAsync(
@@ -19,15 +33,7 @@ public static class RoomSSEExtensions
         params int[] hiddenIndices
     )
     {
-        List<CardDTO> handCopy =
-        [
-            .. hand.Select(
-                (card, index) =>
-                    hiddenIndices.Contains(index)
-                        ? new CardDTO { IsFaceDown = true } // if face down, hide all info
-                        : card
-            ),
-        ];
+        List<CardDTO> handCopy = hiddenIndices.Length != 0 ? hand : hand.HideCards(hiddenIndices);
 
         if (playerId.HasValue)
         {

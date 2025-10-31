@@ -86,7 +86,7 @@ public class BlackjackServiceTest
             Status = Status.Away,
         };
 
-        var bettingStage = new BlackjackBettingStage(DateTimeOffset.UtcNow.AddMinutes(1), []);
+        var bettingStage = new BlackjackBettingStage(DateTimeOffset.UtcNow.AddMinutes(1));
         var gameState = new BlackjackState { CurrentStage = bettingStage };
         var gameStateString = JsonSerializer.Serialize(gameState, DefaultOptions);
         var room = new Room
@@ -164,11 +164,12 @@ public class BlackjackServiceTest
             GameState = "",
         };
 
-        var bettingStage = new BlackjackBettingStage(
-            DateTimeOffset.UtcNow.AddMinutes(-1),
-            new Dictionary<Guid, long> { { otherPlayer.Id, 50L } }
-        );
-        var gameState = new BlackjackState { CurrentStage = bettingStage };
+        var bettingStage = new BlackjackBettingStage(DateTimeOffset.UtcNow.AddMinutes(-1));
+        var gameState = new BlackjackState
+        {
+            Bets = new Dictionary<Guid, long> { { otherPlayer.Id, 50L } },
+            CurrentStage = bettingStage,
+        };
         var gameStateString = JsonSerializer.Serialize(gameState, DefaultOptions);
 
         _roomRepositoryMock.Setup(r => r.GetGameStateAsync(roomId)).ReturnsAsync(gameStateString);
@@ -405,7 +406,7 @@ public class BlackjackServiceTest
         // Arrange
         var roomId = Guid.NewGuid();
         var playerId = Guid.NewGuid();
-        var bettingStage = new BlackjackBettingStage(DateTimeOffset.UtcNow.AddMinutes(1), []);
+        var bettingStage = new BlackjackBettingStage(DateTimeOffset.UtcNow.AddMinutes(1));
         var gameState = new BlackjackState { CurrentStage = bettingStage };
         var gameStateString = JsonSerializer.Serialize(gameState);
 
@@ -427,7 +428,7 @@ public class BlackjackServiceTest
         var roomId = Guid.NewGuid();
         var playerId = Guid.NewGuid();
         var player = new RoomPlayer { Status = Status.Away, Balance = 50 }; // Not enough balance
-        var bettingStage = new BlackjackBettingStage(DateTimeOffset.UtcNow.AddMinutes(1), []);
+        var bettingStage = new BlackjackBettingStage(DateTimeOffset.UtcNow.AddMinutes(1));
         var gameState = new BlackjackState { CurrentStage = bettingStage };
         var gameStateString = JsonSerializer.Serialize(gameState);
 
@@ -457,11 +458,12 @@ public class BlackjackServiceTest
             Status = Status.Away,
         };
 
-        var bettingStage = new BlackjackBettingStage(
-            DateTimeOffset.UtcNow.AddMinutes(-1),
-            new Dictionary<Guid, long> { { missingPlayerId, 50L } } // Bet from the missing player
-        );
-        var gameState = new BlackjackState { CurrentStage = bettingStage };
+        var bettingStage = new BlackjackBettingStage(DateTimeOffset.UtcNow.AddMinutes(-1));
+        var gameState = new BlackjackState
+        {
+            Bets = new Dictionary<Guid, long> { { missingPlayerId, 50L } }, // Bet from the missing player
+            CurrentStage = bettingStage,
+        };
         var gameStateString = JsonSerializer.Serialize(gameState);
 
         _roomRepositoryMock.Setup(r => r.GetGameStateAsync(roomId)).ReturnsAsync(gameStateString);

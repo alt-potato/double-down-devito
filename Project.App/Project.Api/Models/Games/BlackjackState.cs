@@ -1,10 +1,11 @@
 using System.Text.Json.Serialization;
+using Project.Api.DTOs;
 
 namespace Project.Api.Models.Games;
 
 public record BlackjackState : GameState<BlackjackStage>
 {
-    public string DealerHand { get; set; } = "";
+    public List<CardDTO> DealerHand { get; set; } = [];
     public Dictionary<Guid, long> Bets { get; set; } = [];
 }
 
@@ -29,8 +30,7 @@ public record BlackjackInitStage : BlackjackStage;
 public record BlackjackSetupStage : BlackjackStage;
 
 // waiting for players to bet
-public record BlackjackBettingStage(DateTimeOffset Deadline, Dictionary<Guid, long> Bets)
-    : BlackjackStage;
+public record BlackjackBettingStage(DateTimeOffset Deadline) : BlackjackStage;
 
 // dealing
 public record BlackjackDealingStage : BlackjackStage;
