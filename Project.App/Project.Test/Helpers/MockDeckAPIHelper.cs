@@ -10,7 +10,7 @@ public static class MockDeckAPIHelper
     /// Create a mock deck service that returns predictable cards and tracks them.
     /// </summary>
     /// <returns></returns>
-    public static Mock<IDeckApiService> CreateMockDeckService(
+    public static (Mock<IDeckApiService> Mock, Queue<CardDTO> CardSequence) CreateMockDeckService(
         Queue<CardDTO>? predefinedCards = null
     )
     {
@@ -19,7 +19,7 @@ public static class MockDeckAPIHelper
         var playerHandIds = new Dictionary<Guid, string>(); // Track player hand IDs
 
         // Use predefined cards or create a default sequence
-        var cardSequence =
+        var cardQueue =
             predefinedCards
             ?? new Queue<CardDTO>(
                 [
@@ -140,13 +140,13 @@ public static class MockDeckAPIHelper
                     var cards = new List<CardDTO>();
                     for (int i = 0; i < count; i++)
                     {
-                        if (cardSequence.Count == 0)
+                        if (cardQueue.Count == 0)
                         {
                             throw new InvalidOperationException(
                                 "No more cards in predefined sequence"
                             );
                         }
-                        var card = cardSequence.Dequeue();
+                        var card = cardQueue.Dequeue();
                         cards.Add(card);
 
                         if (!handCards.TryGetValue(handId, out List<CardDTO>? value))
@@ -217,6 +217,7 @@ public static class MockDeckAPIHelper
                 }
             );
 
-        return mockDeckService;
+        // return backing queue to allow for manual manipulation
+        return (mockDeckService, cardQueue);
     }
 }
