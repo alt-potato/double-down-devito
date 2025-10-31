@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.Protected;
 using Project.Api.Services;
@@ -9,6 +10,8 @@ namespace Project.Test.Services
 {
     public class DeckApiServiceTests
     {
+        private readonly ILogger<DeckApiService> _loggerMock = Mock.Of<ILogger<DeckApiService>>();
+
         private static HttpClient CreateMockHttpClient(
             string responseContent,
             HttpStatusCode statusCode = HttpStatusCode.OK
@@ -44,7 +47,7 @@ namespace Project.Test.Services
             configMock
                 .Setup(c => c["DeckApiSettings:BaseUrl"])
                 .Returns("https://deckofcardsapi.com/api");
-            var service = new DeckApiService(client, configMock.Object);
+            var service = new DeckApiService(client, _loggerMock, configMock.Object);
 
             // Act
             var result = await service.CreateDeck();
@@ -62,7 +65,7 @@ namespace Project.Test.Services
             configMock
                 .Setup(c => c["DeckApiSettings:BaseUrl"])
                 .Returns("https://deckofcardsapi.com/api");
-            var service = new DeckApiService(client, configMock.Object);
+            var service = new DeckApiService(client, _loggerMock, configMock.Object);
 
             // Act & Assert
             await Assert.ThrowsAsync<HttpRequestException>(() => service.CreateDeck());
@@ -112,7 +115,7 @@ namespace Project.Test.Services
             configMock
                 .Setup(c => c["DeckApiSettings:BaseUrl"])
                 .Returns("https://deckofcardsapi.com/api");
-            var service = new DeckApiService(client, configMock.Object);
+            var service = new DeckApiService(client, _loggerMock, configMock.Object);
 
             // Act
             var result = await service.DrawCards("deck123", "42"); // Changed handId to handName string
@@ -155,7 +158,7 @@ namespace Project.Test.Services
                 .ReturnsAsync(responses.Dequeue);
 
             var client = new HttpClient(handlerMock.Object);
-            var service = new DeckApiService(client);
+            var service = new DeckApiService(client, _loggerMock);
 
             // Act
             var result = await service.DrawCards("deck123", "playerHand", 1);
@@ -185,7 +188,7 @@ namespace Project.Test.Services
             configMock
                 .Setup(c => c["DeckApiSettings:BaseUrl"])
                 .Returns("https://deckofcardsapi.com/api");
-            var service = new DeckApiService(client, configMock.Object);
+            var service = new DeckApiService(client, _loggerMock, configMock.Object);
 
             // Act
             var result = await service.ReturnAllCardsToDeck("deck123");
@@ -203,7 +206,7 @@ namespace Project.Test.Services
             configMock
                 .Setup(c => c["DeckApiSettings:BaseUrl"])
                 .Returns("https://deckofcardsapi.com/api");
-            var service = new DeckApiService(client, configMock.Object);
+            var service = new DeckApiService(client, _loggerMock, configMock.Object);
 
             // Act
             var result = await service.CreateEmptyHand("deck123", 7);
@@ -221,7 +224,7 @@ namespace Project.Test.Services
             configMock
                 .Setup(c => c["DeckApiSettings:BaseUrl"])
                 .Returns("https://deckofcardsapi.com/api");
-            var service = new DeckApiService(client, configMock.Object);
+            var service = new DeckApiService(client, _loggerMock, configMock.Object);
 
             // Act & Assert
             await Assert.ThrowsAsync<HttpRequestException>(() =>
@@ -238,7 +241,7 @@ namespace Project.Test.Services
             configMock
                 .Setup(c => c["DeckApiSettings:BaseUrl"])
                 .Returns("https://deckofcardsapi.com/api");
-            var service = new DeckApiService(client, configMock.Object);
+            var service = new DeckApiService(client, _loggerMock, configMock.Object);
 
             // Act & Assert
             await Assert.ThrowsAsync<HttpRequestException>(() =>

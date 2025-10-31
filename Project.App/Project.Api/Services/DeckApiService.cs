@@ -2,14 +2,17 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Project.Api.DTOs;
 using Project.Api.Services.Interface;
-using Project.Api.Utilities;
 
 namespace Project.Api.Services;
 
-public class DeckApiService(HttpClient client, IConfiguration? configuration = null)
-    : IDeckApiService
+public class DeckApiService(
+    HttpClient client,
+    ILogger<DeckApiService> logger,
+    IConfiguration? configuration = null
+) : IDeckApiService
 {
     private readonly HttpClient _httpClient = client;
+    private readonly ILogger<DeckApiService> _logger = logger;
     private readonly string _baseApiUrl =
         configuration?["DeckApiSettings:BaseUrl"] ?? "https://deckofcardsapi.com/api";
 
@@ -173,7 +176,16 @@ public class DeckApiService(HttpClient client, IConfiguration? configuration = n
     {
         string listPileUrl = $"{_baseApiUrl}/deck/{deckId}/pile/{handName}/list/";
         var listResponse = await _httpClient.GetAsync(listPileUrl);
-        listResponse.EnsureSuccessStatusCode();
+
+        if (!listResponse.IsSuccessStatusCode)
+        {
+            _logger.LogError(
+                "Failed to list cards in hand {handName} in deck {deckId}. Does the hand/deck exist?",
+                handName,
+                deckId
+            );
+            return [];
+        }
 
         var listData = await listResponse.Content.ReadFromJsonAsync<ListPilesResponseDTO>(
             _jsonSerializerOptions
