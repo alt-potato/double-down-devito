@@ -20,17 +20,39 @@ using Xunit.Abstractions;
 
 namespace Project.Test.Integration;
 
-public record PlayerAction
+public record PlayerAction(BlackjackActionDTO Action)
 {
-    public required BlackjackActionDTO Action { get; init; }
     public List<CardDTO> CardsDrawn { get; init; } = [];
+
+    // static factory methods for convenience :)
+
+    public static BetAction Bet(long amount) => new(amount);
+
+    public static PlayerAction Hit(string cardDrawnCode) =>
+        new(new HitAction()) { CardsDrawn = [cardDrawnCode.ToCard()] };
+
+    public static PlayerAction Stand() => new(new StandAction());
+
+    public static PlayerAction Double(string cardDrawnCode) =>
+        new(new DoubleAction()) { CardsDrawn = [cardDrawnCode.ToCard()] };
+
+    public static PlayerAction Split(long amount, string firstCardCode, string secondCardCode) =>
+        new(new SplitAction(amount))
+        {
+            CardsDrawn = [firstCardCode.ToCard(), secondCardCode.ToCard()],
+        };
+
+    public static PlayerAction Surrender() => new(new SurrenderAction());
 }
 
 public record RoundScenario
 {
+    public required List<BetAction> Bets { get; init; }
+
+    // note that initial cards are dealt in a circular order, one card at a time
     public required List<CardDTO> InitialCards { get; init; }
     public required List<PlayerAction> Actions { get; init; }
-    public required List<CardDTO> DealerCards { get; init; }
+    public required List<CardDTO> DealerDraws { get; init; }
 }
 
 public record BlackjackTestScenario : IXunitSerializable
@@ -65,7 +87,7 @@ public record BlackjackTestScenario : IXunitSerializable
     public override string ToString() => Name;
 }
 
-public class BlackjackTestHarness(WebApplicationFactory<Program> appFactory)
+public class BlackjackTestHarness(WebApplicationFactory<Program> appFactory) : IDisposable
 {
     public List<(
         Guid id,
@@ -135,6 +157,18 @@ public class BlackjackTestHarness(WebApplicationFactory<Program> appFactory)
     public async Task EndGameAsync()
     {
         throw new NotImplementedException();
+    }
+
+    public void Dispose()
+    {
+        // clean up SSE connections
+        foreach (var (_, _, reader, cts) in Players)
+        {
+            cts.Cancel();
+            reader.Dispose();
+        }
+
+        GC.SuppressFinalize(this);
     }
 }
 
@@ -306,11 +340,45 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
     {
         return
         [
-            new BlackjackTestScenario
+            new()
             {
                 Name = "BlackjackGameFlow_OneRound",
                 NumberOfPlayers = 3,
-                Rounds = [],
+                Rounds =
+                [
+                    new()
+                    {
+                        Bets =
+                        [
+                            PlayerAction.Bet(100),
+                            PlayerAction.Bet(100),
+                            PlayerAction.Bet(100),
+                        ],
+                        InitialCards =
+                        [
+                            // in order: P0 -> P1 -> P2 -> Dealer -> P0 -> P1 -> P2 -> Dealer
+                            "5H".ToCard(), // Player 0 first card
+                            "0D".ToCard(), // Player 1 first card
+                            "4H".ToCard(), // Player 2 first card
+                            "0H".ToCard(), // Dealer first card
+                            "6S".ToCard(), // Player 0 second card (total: 11)
+                            "6C".ToCard(), // Player 1 second card (total: 16)
+                            "5S".ToCard(), // Player 2 second card (total: 9)
+                            "8D".ToCard(), // Dealer hole card (total: 18)
+                        ],
+                        Actions =
+                        [
+                            PlayerAction.Hit("8D"), // player 0 hits (11 + 8 = 19)
+                            PlayerAction.Stand(), // player 0 stands on 19
+                            PlayerAction.Double("3H"), // player 1 doubles (16 + 3 = 19)
+                            PlayerAction.Surrender(), // player 2 surrenders
+                        ],
+                        DealerDraws =
+                        [
+                            // dealer has 18, no additional draws needed
+                        ],
+                    },
+                ],
             },
         ];
     }
@@ -437,7 +505,7 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
     //                 Value = "3",
     //                 Suit = "HEARTS",
     //                 Code = "3H",
-    //                 Image = "dcard10",
+    //                 Image = "card10",
     //             }, // Player 1 double card (16+3=19)
     //             // No more cards needed:
     //             // - Player 2 surrenders (no cards needed)
