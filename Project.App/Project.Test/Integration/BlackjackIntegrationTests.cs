@@ -47,7 +47,7 @@ public record PlayerAction(BlackjackActionDTO Action)
 
 public record RoundScenario
 {
-    public required List<BetAction> Bets { get; init; }
+    public required List<BetAction?> Bets { get; init; }
 
     // note that initial cards are dealt in a circular order, one card at a time
     public required List<CardDTO> InitialCards { get; init; }
@@ -61,7 +61,7 @@ public record BlackjackTestScenario : IXunitSerializable
     public int NumberOfPlayers { get; set; }
     public List<RoundScenario> Rounds { get; set; }
 
-    // parameterless constructor required for xUnit deserialization.
+    // parameterless constructor required for xUnit deserialization
     public BlackjackTestScenario()
     {
         Name = string.Empty;
@@ -97,8 +97,10 @@ public class BlackjackTestHarness(WebApplicationFactory<Program> appFactory) : I
     )> Players = [];
 
     private readonly WebApplicationFactory<Program> _appFactory = appFactory;
-
-    // private readonly Queue<CardDTO> _deck;
+    private readonly TestDeckApiService _deckService = (TestDeckApiService)
+        appFactory.Services.GetRequiredService<IDeckApiService>();
+    private Guid _roomId = Guid.Empty;
+    private string _deckId = string.Empty;
 
     /// <summary>
     /// Sets up a game with the specified number of players.
@@ -109,49 +111,165 @@ public class BlackjackTestHarness(WebApplicationFactory<Program> appFactory) : I
     {
         // --- INITIALIZE ROOM AND PLAYERS ---
 
-        // create host player
-        var roomId = await Players.CreatePlayer(_appFactory, maxPlayers: numberOfPlayers);
+        // ACT: create host player
+        _roomId = await Players.CreatePlayer(_appFactory, maxPlayers: numberOfPlayers);
 
-        // create other players
+        // ACT: create other players
         for (int i = 1; i < numberOfPlayers; i++)
         {
-            await Players.CreatePlayer(_appFactory, roomId);
+            await Players.CreatePlayer(_appFactory, _roomId);
 
-            // assert that all previous players recieved player join message
+            // ASSERT: all previous players recieved player join message
             var newPlayer = Players.Last();
             foreach (var (id, client, reader, cts) in Players.Take(i))
             {
-                var (eventType, eventData) = await SSETestHelper.ReadSSEEventAsync(reader);
-                eventType.Should().Be(RoomEventType.PlayerJoin);
-                var playerJoinEvent = SSETestHelper.Deserialize<PlayerJoinEventData>(eventData);
-                playerJoinEvent.Should().NotBeNull();
-                playerJoinEvent!.PlayerId.Should().Be(newPlayer.id);
-                playerJoinEvent.PlayerName.Should().Be($"Player{i}");
+                await reader.AssertEventReceived<PlayerJoinEventData>(playerJoinEvent =>
+                {
+                    playerJoinEvent!.PlayerId.Should().Be(newPlayer.id);
+                    playerJoinEvent.PlayerName.Should().Be($"Player{i}");
+                });
             }
         }
 
         // --- START GAME ---
+
+        // ACT: start game (as host player)
         var startGameResponse = await Players[0]
             .client.PostAsJsonAsync<object>(
-                $"/api/room/{roomId}/start",
+                $"/api/room/{_roomId}/start",
                 null!, // use default options
                 ApiJsonSerializerOptions.DefaultOptions
             );
         startGameResponse.EnsureSuccessStatusCode();
 
-        // ASSERT: Game started and betting stage began
+        // ASSERT: confirm game start messsage was sent to all players
         foreach (var (_, _, reader, _) in Players)
         {
-            var (eventType, eventData) = await SSETestHelper.ReadSSEEventAsync(reader);
-            eventType.Should().Be(RoomEventType.GameStateUpdate);
-            var gameStateUpdate = SSETestHelper.Deserialize<GameStateUpdateEventData>(eventData);
-            gameStateUpdate!.CurrentStage.Should().BeOfType<BlackjackBettingStage>();
+            await reader.AssertEventReceived<GameStateUpdateEventData>(gameStateUpdate =>
+            {
+                gameStateUpdate!.CurrentStage.Should().BeOfType<BlackjackBettingStage>();
+            });
         }
+
+        // ASSERT: confirm gamestate is correct and deck was created
+        var gameStateResponse = await Players[0]
+            .client.GetFromJsonAsync<BlackjackState>(
+                $"/api/room/{_roomId}/gamestate",
+                ApiJsonSerializerOptions.DefaultOptions
+            );
+        gameStateResponse!.CurrentStage.Should().BeOfType<BlackjackBettingStage>();
+        // gameStateResponse!.DeckId.Should().NotBeNullOrEmpty();
     }
 
     public async Task ProcessRoundAsync(RoundScenario round)
     {
-        throw new NotImplementedException();
+        if (Players.Count == 0)
+            throw new InvalidOperationException("Players have not been set up yet.");
+        if (_roomId == Guid.Empty)
+            throw new InvalidOperationException("Room has not been set up yet.");
+        if (round.Bets.Count != Players.Count)
+            throw new InvalidOperationException("Number of bets does not match number of players.");
+        if (round.Actions.Count < Players.Count)
+            throw new InvalidOperationException("Not enough actions for the number of players.");
+
+        // ASSERT: confirm the room is in the betting stage using /api/room/{roomId}/gamestate
+        var gameStateResponse = await Players[0]
+            .client.GetFromJsonAsync<BlackjackState>(
+                $"/api/room/{_roomId}/gamestate",
+                ApiJsonSerializerOptions.DefaultOptions
+            );
+        gameStateResponse!.CurrentStage.Should().BeOfType<BlackjackBettingStage>();
+
+        // --- BETTING PHASE ---
+
+        // ACT: set initial cards in the deck
+
+        // ACT: place all bets as given
+        for (int i = 0; i < Players.Count; i++)
+        {
+            if (round.Bets[i] == null)
+                continue;
+
+            var (id, client, _, _) = Players[i];
+            var bet = round.Bets[i];
+            var betResponse = await client.PostAsJsonAsync(
+                $"/api/room/{_roomId}/player/{id}/action",
+                new { Action = "bet", Data = bet },
+                ApiJsonSerializerOptions.DefaultOptions
+            );
+            betResponse.EnsureSuccessStatusCode();
+        }
+
+        // ASSERT: confirm all players receive the correct messages
+        foreach (var (id, client, reader, _) in Players)
+        {
+            // ASSERT: confirm player received all bet messages and state transition messages
+            for (int i = 0; i < round.Bets.Count; i++)
+            {
+                if (round.Bets[i] == null)
+                    continue;
+
+                // ASSERT: recieve each player's bet action first
+                await reader.AssertEventReceived<PlayerActionEventData>(action =>
+                {
+                    action!.Action.Should().Be("bet");
+                    action.Amount.Should().Be(round.Bets[i]!.Amount);
+                });
+
+                // ASSERT: then receive state transition message (still in betting stage)
+                await reader.AssertEventReceived<GameStateUpdateEventData>(gameStateUpdate =>
+                {
+                    gameStateUpdate!.CurrentStage.Should().BeOfType<BlackjackBettingStage>();
+                });
+            }
+
+            // ASSERT: after all bets, confirm state transition to dealing stage
+            await reader.AssertEventReceived<GameStateUpdateEventData>(gameStateUpdate =>
+            {
+                gameStateUpdate!.CurrentStage.Should().BeOfType<BlackjackDealingStage>();
+            });
+
+            // --- DEALING PHASE ---
+
+            // ACT: deal cards (in service)
+
+            // ASSERT: confirm player received dealing messages for every player
+            for (int i = 0; i < Players.Count; i++)
+            {
+                if (round.Bets[i] == null)
+                    continue;
+
+                await reader.AssertEventReceived<PlayerRevealEventData>(reveal =>
+                {
+                    reveal!.PlayerHand.Should().NotBeNullOrEmpty();
+                    reveal.PlayerHand.Count.Should().Be(2); // players get both cards at once
+                });
+            }
+
+            // ASSERT: confirm player received dealer reveal message (second card face down)
+            await reader.AssertEventReceived<DealerRevealEventData>(reveal =>
+            {
+                reveal!.DealerHand.Should().NotBeNullOrEmpty();
+                reveal.DealerHand.Count.Should().Be(2);
+                reveal.DealerHand[1].IsFaceDown.Should().BeTrue(); // hole card is face down
+            });
+
+            // ASSERT: confirm player received state transition message (player action stage)
+            await reader.AssertEventReceived<GameStateUpdateEventData>(gameStateUpdate =>
+            {
+                gameStateUpdate!.CurrentStage.Should().BeOfType<BlackjackPlayerActionStage>();
+            });
+        }
+
+        // --- PLAYER ACTION PHASE ---
+
+        // ASSERT: confirm game state is in action phase using /api/room/{roomId}/gamestate
+        gameStateResponse = await Players[0]
+            .client.GetFromJsonAsync<BlackjackState>(
+                $"/api/room/{_roomId}/gamestate",
+                ApiJsonSerializerOptions.DefaultOptions
+            );
+        gameStateResponse!.CurrentStage.Should().BeOfType<BlackjackPlayerActionStage>();
     }
 
     public async Task EndGameAsync()
@@ -302,34 +420,21 @@ public static class GameTestHarnessExtensions
         );
         joinRoomResponse.EnsureSuccessStatusCode();
     }
-}
 
-public static class SSETestHelper
-{
-    public static async Task<(RoomEventType type, string data)> ReadSSEEventAsync(
-        StreamReader reader
+    public static async Task<T> AssertEventReceived<T>(
+        this StreamReader reader,
+        Action<T>? validation = null
     )
+        where T : IRoomEventData
     {
-        var eventLine = await reader.ReadLineAsync();
-        var dataLine = await reader.ReadLineAsync();
-        await reader.ReadLineAsync(); // consume blank line
+        var (eventType, eventData) = await SSEHelper.ReadSSEEventAsync<RoomEventType>(reader);
+        eventType.Should().Be(T.EventType);
 
-        if (eventLine == null || dataLine == null)
-        {
-            throw new EndOfStreamException("SSE stream ended unexpectedly.");
-        }
+        var deserializedEvent = ApiHelper.Deserialize<T>(eventData);
+        deserializedEvent.Should().NotBeNull();
 
-        var eventTypeString = eventLine.Replace("event: ", "").ToPascalCase();
-        Enum.TryParse<RoomEventType>(eventTypeString, true, out var eventType)
-            .Should()
-            .BeTrue($"because '{eventTypeString}' should be a valid RoomEventType");
-
-        return (eventType, dataLine.Replace("data: ", ""));
-    }
-
-    public static T? Deserialize<T>(string data)
-    {
-        return JsonSerializer.Deserialize<T>(data, ApiJsonSerializerOptions.DefaultOptions);
+        validation?.Invoke(deserializedEvent);
+        return deserializedEvent;
     }
 }
 
@@ -392,7 +497,7 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
         // ARRANGE: set up services
 
         var dbName = $"InMemoryDb_{Guid.CreateVersion7()}";
-        (var mockDeckService, var deckQueue) = MockDeckAPIHelper.CreateMockDeckService([]);
+        var mockDeckService = new TestDeckApiService();
 
         var appFactory = CreateConfiguredWebAppFactory(
             services =>
@@ -405,7 +510,7 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
 
                 // Replace IDeckApiService with mock
                 services.RemoveAll<IDeckApiService>();
-                services.AddSingleton(mockDeckService.Object);
+                services.AddSingleton(mockDeckService);
             },
             dbName
         );
@@ -416,10 +521,10 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
 
         await harness.SetupGameAsync(scenario.NumberOfPlayers);
 
-        // foreach (var round in scenario.Rounds)
-        // {
-        //     await harness.ProcessRoundAsync(round);
-        // }
+        foreach (var round in scenario.Rounds)
+        {
+            await harness.ProcessRoundAsync(round);
+        }
 
         // await harness.EndGameAsync();
     }
@@ -1772,33 +1877,4 @@ public class BlackjackIntegrationTests(WebApplicationFactory<Program> factory)
     //         cts.Cancel();
     //     }
     // }
-
-    private static async Task AssertPlayerActionAndTurnChange(
-        StreamReader reader,
-        string expectedAction,
-        Guid expectedPlayerId,
-        int nextPlayerIndex
-    )
-    {
-        // Assert: Player action was broadcast
-        var (actionEventType, actionEventData) = await SSETestHelper.ReadSSEEventAsync(reader);
-        actionEventType.Should().Be(RoomEventType.PlayerAction);
-        var playerAction = SSETestHelper.Deserialize<PlayerActionEventData>(actionEventData);
-        playerAction!.Action.Should().Be(expectedAction);
-        playerAction.PlayerId.Should().Be(expectedPlayerId);
-
-        // Assert: Game state updated to next player's turn
-        var (turnChangeEventType, turnChangeEventData) = await SSETestHelper.ReadSSEEventAsync(
-            reader
-        );
-        turnChangeEventType.Should().Be(RoomEventType.GameStateUpdate);
-        var turnChangeUpdate = SSETestHelper.Deserialize<GameStateUpdateEventData>(
-            turnChangeEventData
-        );
-        var nextActionStage = turnChangeUpdate!
-            .CurrentStage.Should()
-            .BeOfType<BlackjackPlayerActionStage>()
-            .Subject;
-        nextActionStage.PlayerIndex.Should().Be(nextPlayerIndex);
-    }
 }

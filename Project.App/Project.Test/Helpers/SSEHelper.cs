@@ -1,4 +1,6 @@
 using System.Text;
+using FluentAssertions;
+using Project.Api.Utilities.Extensions;
 
 namespace Project.Test.Helpers;
 
@@ -37,5 +39,30 @@ public static class SSEHelper
         // without disposing the client, which closes the connection.
         // For explicit disconnection testing, we'll rely on client.Dispose().
         return (reader, cts);
+    }
+
+    /// <summary>
+    /// Helper to read an SSE event from the stream and assert the event type is valid.
+    /// </summary>
+    public static async Task<(TEnum type, string data)> ReadSSEEventAsync<TEnum>(
+        StreamReader reader
+    )
+        where TEnum : struct, Enum
+    {
+        var eventLine = await reader.ReadLineAsync();
+        var dataLine = await reader.ReadLineAsync();
+        await reader.ReadLineAsync(); // consume blank line
+
+        if (eventLine == null || dataLine == null)
+        {
+            throw new EndOfStreamException("SSE stream ended unexpectedly.");
+        }
+
+        var eventTypeString = eventLine.Replace("event: ", "").ToPascalCase();
+        Enum.TryParse<TEnum>(eventTypeString, true, out var eventType)
+            .Should()
+            .BeTrue($"because '{eventTypeString}' should be a valid RoomEventType");
+
+        return (eventType, dataLine.Replace("data: ", ""));
     }
 }

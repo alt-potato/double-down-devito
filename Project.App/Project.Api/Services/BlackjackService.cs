@@ -333,7 +333,7 @@ public class BlackjackService(
         if (!IsActionValid(action, state.CurrentStage))
         {
             throw new BadRequestException(
-                $"Action {action} is not a valid action for this game stage."
+                $"Action {action} is not a valid action for this game stage ({state.CurrentStage})."
             );
         }
 
