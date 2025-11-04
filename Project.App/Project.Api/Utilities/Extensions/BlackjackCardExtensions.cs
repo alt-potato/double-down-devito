@@ -87,19 +87,19 @@ public static class BlackjackCardExtensions
     public static async Task SaveStateAndBroadcastAsync(
         this BlackjackState state,
         Guid roomId,
-        IRoomRepository? roomRepository = null,
+        IGameRepository? gameRepository = null,
         IRoomSSEService? roomSSEService = null,
         JsonSerializerOptions? jsonOptions = null
     )
     {
-        if (roomRepository is not null)
+        if (gameRepository is not null)
         {
             // save state
             string updatedGameState = JsonSerializer.Serialize(
                 state,
                 jsonOptions ?? ApiJsonSerializerOptions.DefaultOptions
             );
-            await roomRepository.UpdateGameStateAsync(roomId, updatedGameState);
+            await gameRepository.UpdateGameStateAsync(roomId, updatedGameState);
         }
 
         if (roomSSEService is not null)

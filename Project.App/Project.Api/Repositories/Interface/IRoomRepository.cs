@@ -4,17 +4,48 @@ namespace Project.Api.Repositories.Interface;
 
 public interface IRoomRepository
 {
-    Task<Room?> GetByIdAsync(Guid id);
-    Task<IEnumerable<Room>> GetAllAsync();
-    Task<IEnumerable<Room>> GetActiveRoomsAsync();
-    Task<IEnumerable<Room>> GetPublicRoomsAsync();
-    Task<Room?> GetByHostIdAsync(Guid hostId);
-    Task<Room> CreateAsync(Room room);
-    Task<Room?> UpdateAsync(Room room);
-    Task<bool> DeleteAsync(Guid id);
-    Task<bool> ExistsAsync(Guid id);
-    Task<string> GetGameStateAsync(Guid id);
-    Task<bool> UpdateGameStateAsync(Guid id, string gamestate);
-    Task<string> GetGameConfigAsync(Guid id);
-    Task<bool> UpdateGameConfigAsync(Guid id, string gameConfig);
+    /// <summary>
+    /// Get a room by its ID.
+    /// </summary>
+    Task<Room?> GetRoomByIdAsync(Guid id);
+
+    /// <summary>
+    /// Get all rooms.
+    /// </summary>
+    Task<List<Room>> GetAllRoomsAsync();
+
+    /// <summary>
+    /// Get all active rooms.
+    /// </summary>
+    Task<List<Room>> GetActiveRoomsAsync();
+
+    /// <summary>
+    /// Get all public rooms.
+    /// </summary>
+    Task<List<Room>> GetPublicRoomsAsync();
+
+    /// <summary>
+    /// Get a room by host ID.
+    /// </summary>
+    Task<Room?> GetRoomByHostIdAsync(Guid hostId);
+
+    /// <summary>
+    /// Create a new room.
+    /// </summary>
+    Task<Room> CreateRoomAsync(Room room);
+
+    /// <summary>
+    /// Update an existing room.
+    /// </summary>
+    Task<Room> UpdateRoomAsync(Room room);
+
+    /// <summary>
+    /// Delete a room by its ID.
+    /// </summary>
+    Task<Room> DeleteRoomAsync(Guid id);
+
+    /// <summary>
+    /// Check if a room exists by its ID.
+    /// </summary>
+    Task<bool> RoomExistsAsync(Guid id);
 }

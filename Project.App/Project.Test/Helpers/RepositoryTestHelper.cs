@@ -43,8 +43,7 @@ public static class RepositoryTestHelper
         Guid? hostId = null,
         bool isPublic = true,
         bool isActive = true,
-        string? gameMode = null,
-        string? gameState = null,
+        string? description = null,
         int maxPlayers = 6,
         int minPlayers = 2
     )
@@ -56,33 +55,85 @@ public static class RepositoryTestHelper
             IsPublic = isPublic,
             IsActive = isActive,
             CreatedAt = DateTime.UtcNow,
-            GameMode = gameMode ?? "Texas Hold'em",
-            GameState = gameState ?? "Waiting",
+            Description = description ?? "Test Room",
             MaxPlayers = maxPlayers,
             MinPlayers = minPlayers,
-            DeckId = "1",
-            Round = 0,
         };
     }
 
     // Creates a test room player with optional custom properties.
     public static RoomPlayer CreateTestRoomPlayer(
-        Guid? id = null,
         Guid? roomId = null,
         Guid? userId = null,
-        Role role = Role.Player,
-        Status status = Status.Active,
-        long balance = 1000
+        Status status = Status.Active
     )
     {
         return new RoomPlayer
         {
-            Id = id ?? Guid.NewGuid(),
             RoomId = roomId ?? Guid.NewGuid(),
             UserId = userId ?? Guid.NewGuid(),
-            Role = role,
             Status = status,
+        };
+    }
+
+    // Creates a test game with optional custom properties.
+    public static Game CreateTestGame(
+        Guid? id = null,
+        string? gameMode = null,
+        string? gameState = null,
+        string? state = null,
+        int round = 0,
+        string? deckId = null,
+        DateTimeOffset? endedAt = null,
+        DateTimeOffset? createdAt = null
+    )
+    {
+        return new Game
+        {
+            Id = id ?? Guid.NewGuid(),
+            GameMode = gameMode ?? "Blackjack",
+            GameState = gameState ?? "{}",
+            State = state ?? "{}",
+            Round = round,
+            DeckId = deckId ?? "",
+            EndedAt = endedAt,
+            CreatedAt = createdAt ?? DateTimeOffset.UtcNow,
+        };
+    }
+
+    // Creates a test game player with optional custom properties.
+    public static GamePlayer CreateTestGamePlayer(
+        Guid? gameId = null,
+        Guid? userId = null,
+        long balance = 1000,
+        long balanceDelta = 0
+    )
+    {
+        return new GamePlayer
+        {
+            GameId = gameId ?? Guid.NewGuid(),
+            UserId = userId ?? Guid.NewGuid(),
             Balance = balance,
+            BalanceDelta = balanceDelta,
+        };
+    }
+
+    // Creates a test hand with optional custom properties.
+    public static Hand CreateTestHand(
+        Guid? gameId = null,
+        Guid? userId = null,
+        int order = 1,
+        int handNumber = 1,
+        int bet = 100
+    )
+    {
+        return new Hand
+        {
+            GameId = gameId ?? Guid.NewGuid(),
+            UserId = userId ?? Guid.NewGuid(),
+            Order = order,
+            HandNumber = handNumber,
+            Bet = bet,
         };
     }
 }

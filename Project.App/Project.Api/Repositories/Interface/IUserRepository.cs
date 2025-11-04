@@ -1,17 +1,41 @@
-using System.Reflection.Metadata;
 using Project.Api.Models;
 
-namespace Project.Api.Repositories.Interface
+namespace Project.Api.Repositories.Interface;
+
+public interface IUserRepository
 {
-    public interface IUserRepository
-    {
-        Task<IEnumerable<User>> GetAllAsync();
-        Task<User?> GetByIdAsync(Guid id);
-        Task<User?> GetByEmailAsync(string email);
-        Task AddAsync(User user);
-        Task UpdateAsync(User user);
-        Task UpdateBalanceAsync(User user);
-        Task DeleteAsync(Guid id);
-        Task SaveChangesAsync();
-    }
+    /// <summary>
+    /// Get all users.
+    /// </summary>
+    Task<List<User>> GetAllUsersAsync();
+
+    /// <summary>
+    /// Get a user by their ID.
+    /// </summary>
+    Task<User?> GetUserByIdAsync(Guid id);
+
+    /// <summary>
+    /// Get a user by their email.
+    /// </summary>
+    Task<User?> GetUserByEmailAsync(string email);
+
+    /// <summary>
+    /// Create a new user.
+    /// </summary>
+    Task<User> CreateUserAsync(User user);
+
+    /// <summary>
+    /// Update an existing user.
+    /// </summary>
+    Task<User> UpdateUserAsync(User user);
+
+    /// <summary>
+    /// Update user balance.
+    /// </summary>
+    Task<User> UpdateUserBalanceAsync(Guid id, double balance);
+
+    /// <summary>
+    /// Delete a user by their ID.
+    /// </summary>
+    Task<User> DeleteUserAsync(Guid id);
 }

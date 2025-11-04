@@ -1,0 +1,82 @@
+// visualization: https://dbdiagram.io/d
+// docs: https://dbml.dbdiagram.io/docs
+
+Table Users {
+  Id uniqueidentifier [pk, default: `newid()`]
+  Name nvarchar(256) [not null]
+  Email nvarchar(256) [not null, unique]
+  Balance float [not null, default: 1000]
+  AvatarUrl nvarchar(512)
+
+  Indexes {
+    (Email) [unique]
+  }
+}
+
+Table Rooms {
+  Id uniqueidentifier [pk]
+  HostId uniqueidentifier [not null]
+  IsPublic bit [not null]
+  IsActive bit [not null]
+  Description nvarchar(500)
+  MaxPlayers int [not null]
+  MinPlayers int [not null]
+  CreatedAt datetimeoffset [not null]
+  StartedAt datetimeoffset
+  EndedAt datetimeoffset
+  GameId uniqueidentifier [ref: - Games.Id]
+  RowVersion rowversion [not null]
+}
+
+Ref: Rooms.HostId > Users.Id
+
+Table RoomPlayers {
+  RoomId uniqueidentifier [not null]
+  UserId uniqueidentifier [not null]
+  Status nvarchar [not null, default: 0] // enum as string
+
+  Indexes {
+    (RoomId, UserId) [unique, name: 'IX_RoomPlayer_RoomId_UserId_Unique']
+  }
+}
+
+Ref: RoomPlayers.RoomId > Rooms.Id [delete: Restrict]
+Ref: RoomPlayers.UserId > Users.Id [delete: Restrict]
+
+Table Games {
+  Id uniqueidentifier [pk]
+  GameMode nvarchar(50) [not null]
+  GameConfig nvarchar(max) [not null, default: '']
+  GameState nvarchar(max) [not null]
+  DeckId nvarchar(max) [default: ''] // TODO: move to gamestate
+  Round int [not null]
+  State nvarchar(max) [not null, default: '']
+  RowVersion rowversion [not null]
+}
+
+Table GamePlayers {
+  GameId uniqueidentifier [not null]
+  UserId uniqueidentifier [not null]
+  Balance bigint [not null]
+  BalanceDelta bigint [not null, default: 0]
+
+  Indexes {
+    (GameId, UserId) [unique, name: 'IX_GamePlayer_GameId_UserId_Unique']
+  }
+}
+
+Ref: GamePlayers.GameId > Games.Id [delete: Restrict]
+Ref: GamePlayers.UserId > Users.Id [delete: Restrict]
+
+Table Hands {
+  Id uniqueidentifier [pk, default: `newid()`]
+  GameId uniqueidentifier [not null]
+  UserId uniqueidentifier [not null]
+  Order int [not null]
+  HandNumber int [not null, default: 0]
+  Bet bigint [not null]
+}
+
+// technically a fk relationship to GamePlayers, which has a composite key
+Ref: Hands.GameId > Games.Id
+Ref: Hands.UserId > Users.Id

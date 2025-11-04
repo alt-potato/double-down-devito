@@ -31,7 +31,7 @@ public partial class AppDbContext
             .OnDelete(DeleteBehavior.Restrict);
 
         // Configure GameState as JSON column for SQL Server
-        modelBuilder.Entity<Room>().Property(r => r.GameState).HasColumnType("nvarchar(max)");
+        modelBuilder.Entity<Game>().Property(r => r.GameState).HasColumnType("nvarchar(max)");
 
         // Add unique constraint to prevent duplicate player entries in same room
         modelBuilder

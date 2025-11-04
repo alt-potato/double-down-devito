@@ -1,25 +1,41 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Project.Api.Models
+namespace Project.Api.Models;
+
+public class User
 {
-    public class User
+    public User()
     {
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public Guid Id { get; set; }
+        Id = Guid.CreateVersion7();
+    }
 
-        [Required, MaxLength(256)]
-        public string Name { get; set; } = null!;
+    [Key]
+    public Guid Id { get; set; }
 
-        [Required, MaxLength(256)]
-        public string Email { get; set; } = null!;
+    [Required, MaxLength(256)]
+    public string Name { get; set; } = null!;
 
-        public double Balance { get; set; } = 1000;
+    [Required, MaxLength(256)]
+    public string Email { get; set; } = null!;
 
-        [MaxLength(512)]
-        public string? AvatarUrl { get; set; } //we will send this to the front for our pfp
+    public double Balance { get; set; } = 1000;
 
-        public ICollection<RoomPlayer> RoomPlayers { get; set; } = [];
+    [MaxLength(512)]
+    public string? AvatarUrl { get; set; } // we will send this to the front for our pfp
+
+    public ICollection<RoomPlayer> RoomPlayers { get; set; } = [];
+
+    public ICollection<GamePlayer> GamePlayers { get; set; } = [];
+
+    public byte[] RowVersion { get; set; } = []; // concurrency
+}
+
+public class UserConfiguration : IEntityTypeConfiguration<User>
+{
+    public void Configure(EntityTypeBuilder<User> builder)
+    {
+        builder.Property(r => r.RowVersion).IsRowVersion();
     }
 }

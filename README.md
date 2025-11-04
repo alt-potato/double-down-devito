@@ -26,7 +26,7 @@ DeVito Lounge is a full-stack web application that brings the classic blackjack 
 📈 Future-Ready Features – Built to support enhancements like leaderboards, chat, and multiplayer matchmaking.
 
 ## Entity Relationship Diagram (ERD)
-![alt text](Images/ERD.png)
+![alt text](Images/ERD2.png)
 
 ## Wireframe Diagram
 ![alt text](Images/Wireframe.jpg)

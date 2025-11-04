@@ -1,15 +1,13 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Project.Api.Utilities.Enums;
 
 namespace Project.Api.Models;
 
 public class RoomPlayer
 {
-    [Key]
-    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    public Guid Id { get; set; }
-
     [Required]
     public Guid RoomId { get; set; }
 
@@ -22,14 +20,17 @@ public class RoomPlayer
     [ForeignKey("UserId")]
     public virtual User? User { get; set; }
 
-    public virtual ICollection<Hand> Hands { get; set; } = [];
-
-    public Role Role { get; set; }
-
     public Status Status { get; set; } = Status.Active;
 
-    [Required]
-    public long Balance { get; set; }
+    public byte[] RowVersion { get; set; } = []; // concurrency
+}
 
-    public long BalanceDelta { get; set; } = 0;
+public class RoomPlayerConfiguration : IEntityTypeConfiguration<RoomPlayer>
+{
+    public void Configure(EntityTypeBuilder<RoomPlayer> builder)
+    {
+        builder.HasKey(rp => new { rp.RoomId, rp.UserId });
+
+        builder.Property(r => r.RowVersion).IsRowVersion();
+    }
 }

@@ -1,44 +1,46 @@
 using Project.Api.Models;
 
-namespace Project.Api.Repositories.Interface
+namespace Project.Api.Repositories.Interface;
+
+public interface IHandRepository
 {
-    /*
-        Name: IHandRepository.cs
-        Description: Interface for Hand repository
-        Children: HandRepository.cs
-    */
-    public interface IHandRepository
-    {
-        // Define Fields
-        // Get a hand by its ID
-        Task<Hand?> GetHandByIdAsync(Guid handId);
+    /// <summary>
+    /// Get a hand by its ID.
+    /// </summary>
+    Task<Hand?> GetHandByIdAsync(Guid handId);
 
-        // Get all hands in a room
+    /// <summary>
+    /// Get all hands in a game.
+    /// </summary>
+    Task<List<Hand>> GetHandsByGameIdAsync(Guid gameId);
 
-        Task<List<Hand>> GetHandsByRoomIdAsync(Guid roomId);
+    /// <summary>
+    /// Get all hands in a specific game for a specific user.
+    /// </summary>
+    Task<List<Hand>> GetHandsByGameIdAndUserIdAsync(Guid gameId, Guid userId);
 
-        // Get all hands by a user in a room
-        Task<List<Hand>> GetHandsByUserIdAsync(Guid roomId, Guid userId);
+    /// <summary>
+    /// Get a hand by game ID, player order, and hand order.
+    /// </summary>
+    Task<Hand?> GetHandByGameTurnOrderAsync(Guid gameId, int playerOrder, int handOrder);
 
-        /// <summary>
-        /// Get a hand by room ID, player order, and hand order.
-        /// </summary>
-        /// <throws>NotFoundException no hand is found.</throws>
-        Task<Hand> GetHandByRoomOrderAsync(Guid roomId, int playerOrder, int handOrder);
+    /// <summary>
+    /// Create a new hand.
+    /// </summary>
+    Task<Hand> CreateHandAsync(Hand hand);
 
-        // Create a new hand
-        Task<Hand> CreateHandAsync(Hand hand);
+    /// <summary>
+    /// Update an existing hand.
+    /// </summary>
+    Task<Hand> UpdateHandAsync(Guid handId, Hand hand);
 
-        // Update an existing hand
-        Task<Hand> UpdateHandAsync(Guid handId, Hand hand);
+    /// <summary>
+    /// Partially update an existing hand.
+    /// </summary>
+    Task<Hand> PatchHandAsync(Guid handId, int? Order = null, int? Bet = null);
 
-        // Partially update an existing hand
-        Task<Hand> PatchHandAsync(Guid handId, int? Order = null, int? Bet = null);
-
-        // Delete a hand
-        Task<Hand> DeleteHandAsync(Guid handId);
-
-        // Save changes to the database
-        Task SaveChangesAsync();
-    }
+    /// <summary>
+    /// Delete a hand by its ID.
+    /// </summary>
+    Task<Hand> DeleteHandAsync(Guid handId);
 }

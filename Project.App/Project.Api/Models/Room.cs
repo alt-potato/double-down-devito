@@ -2,49 +2,47 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Project.Api.Models.Interfaces;
 
 namespace Project.Api.Models;
 
-public class Room
+public class Room : ITimestamped
 {
+    public Room()
+    {
+        Id = Guid.CreateVersion7();
+    }
+
     [Key]
-    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public Guid Id { get; set; }
 
     public Guid HostId { get; set; }
+
+    public virtual User? Host { get; set; } // navigation property
 
     public bool IsPublic { get; set; }
 
     public bool IsActive { get; set; }
 
-    public DateTimeOffset CreatedAt { get; set; }
-
-    public DateTimeOffset? StartedAt { get; set; }
-
-    public DateTimeOffset? EndedAt { get; set; }
-
-    [MaxLength(50)]
-    public required string GameMode { get; set; }
-
-    public string GameConfig { get; set; } = string.Empty;
-
-    public required string GameState { get; set; }
-
-    [MaxLength(500)]
-    public string? Description { get; set; }
+    [MaxLength(512)]
+    public string Description { get; set; } = "";
 
     public int MaxPlayers { get; set; }
 
     public int MinPlayers { get; set; }
 
-    public string? DeckId { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; set; }
 
-    public int Round { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
 
-    public string State { get; set; } = string.Empty;
+    public DateTimeOffset? StartedAt { get; set; }
 
-    [ForeignKey("HostId")]
-    public virtual User? Host { get; set; }
+    public DateTimeOffset? EndedAt { get; set; }
+
+    public Guid? GameId { get; set; }
+
+    [ForeignKey("GameId")]
+    public virtual Game? Game { get; set; }
 
     public virtual ICollection<RoomPlayer> RoomPlayers { get; set; } = [];
 

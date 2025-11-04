@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Project.Api.Data;
 using Project.Api.Models;
@@ -12,18 +11,13 @@ namespace Project.Api.Repositories;
     Description: Repository for Hand entity
     Children: IHandRepository.cs
 */
-public class HandRepository : IHandRepository
+public class HandRepository(AppDbContext context) : IHandRepository
 {
-    private readonly AppDbContext _context;
+    private readonly AppDbContext _context = context;
 
-    // Constructor
-    public HandRepository(AppDbContext context)
-    {
-        _context = context;
-    }
-
-    // Implement the methods
-    // Get a hand by its ID
+    /// <summary>
+    /// Get a hand by its ID.
+    /// </summary>
     public async Task<Hand?> GetHandByIdAsync(Guid handId)
     {
         // Validate handId
@@ -33,90 +27,99 @@ public class HandRepository : IHandRepository
         }
         // Retrieve the hand from the database
         Hand? hand = await _context.Hands.FirstOrDefaultAsync(h => h.Id == handId);
-        // return hand or throw exception if not found
-        return hand ?? throw new Exception("Hand not found");
+        // return hand (can be null)
+        return hand;
     }
 
-    public async Task<List<Hand>> GetHandsByRoomIdAsync(Guid roomId)
+    /// <summary>
+    /// Get all hands in a game.
+    /// </summary>
+    public async Task<List<Hand>> GetHandsByGameIdAsync(Guid gameId)
     {
-        // Validate roomId
-        if (roomId == Guid.Empty)
+        // Validate gameId
+        if (gameId == Guid.Empty)
         {
-            throw new ArgumentException("Invalid roomId");
+            throw new ArgumentException("Invalid gameId");
         }
         // Retrieve the hands from the database
         List<Hand> hands = await _context
-            .Hands.Include(h => h.RoomPlayer)
-            .Where(h => h.RoomPlayer != null && h.RoomPlayer.RoomId == roomId)
+            .Hands.Include(h => h.GamePlayer)
+            .Where(h => h.GameId == gameId)
             .ToListAsync();
-        // return hands or throw exception if not found
-        return (hands == null || hands.Count == 0) ? throw new Exception("No hands found") : hands;
+        // return hands (can be empty)
+        return hands;
     }
 
-    public async Task<List<Hand>> GetHandsByUserIdAsync(Guid roomId, Guid userId)
+    /// <summary>
+    /// Get all hands in a specific game for a specific user.
+    /// </summary>
+    public async Task<List<Hand>> GetHandsByGameIdAndUserIdAsync(Guid gameId, Guid userId)
     {
-        // Validate roomId and userId
-        if (userId == Guid.Empty || roomId == Guid.Empty)
+        // Validate gameId and userId
+        if (userId == Guid.Empty || gameId == Guid.Empty)
         {
-            throw new ArgumentException(userId == Guid.Empty ? "Invalid userId" : "Invalid roomId");
+            throw new BadRequestException(
+                userId == Guid.Empty ? "Invalid userId" : "Invalid gameId"
+            );
         }
         // Retrieve the hands from the database
         List<Hand> hands = await _context
-            .Hands.Include(h => h.RoomPlayer)
-            .Where(h =>
-                h.RoomPlayer != null
-                && h.RoomPlayer.RoomId == roomId
-                && h.RoomPlayer.UserId == userId
-            )
+            .Hands.Include(h => h.GamePlayer)
+            .Where(h => h.GameId == gameId && h.UserId == userId)
             .ToListAsync();
-        // return hands or throw exception if not found
-        return (hands == null || hands.Count == 0) ? throw new Exception("No hands found") : hands;
+        // return hands (can be empty)
+        return hands;
     }
 
-    public async Task<Hand> GetHandByRoomOrderAsync(Guid roomId, int playerOrder, int handOrder)
+    /// <summary>
+    /// Get a hand by game ID, player order, and hand order.
+    /// </summary>
+    public async Task<Hand?> GetHandByGameTurnOrderAsync(
+        Guid gameId,
+        int playerOrder,
+        int handOrder
+    )
     {
-        // Validate roomId
-        if (roomId == Guid.Empty)
+        // Validate gameId
+        if (gameId == Guid.Empty)
         {
-            throw new ArgumentException("Invalid roomId");
+            throw new ArgumentException("Invalid gameId");
         }
 
         // Retrieve the hand from the database
         Hand? hand = await _context
-            .Hands.Include(h => h.RoomPlayer)
+            .Hands.Include(h => h.GamePlayer)
             .FirstOrDefaultAsync(h =>
-                h.RoomPlayer != null
-                && h.RoomPlayer.RoomId == roomId
-                && h.Order == playerOrder
-                && h.HandNumber == handOrder
+                h.GameId == gameId && h.Order == playerOrder && h.HandNumber == handOrder
             );
-        // return hand or throw exception if not found
-        return hand ?? throw new NotFoundException("Hand not found");
+        // return hand (can be null)
+        return hand;
     }
 
-    // Create a new hand
+    /// <summary>
+    /// Create a new hand.
+    /// </summary>
     public async Task<Hand> CreateHandAsync(Hand hand)
     {
         //check if hand does not exist
-        if (hand == null)
-        {
-            throw new ArgumentNullException("Hand cannot be null");
-        }
+        ArgumentNullException.ThrowIfNull(hand);
 
         // Asynchronously add the hand to the context and save changes
         await _context.Hands.AddAsync(hand);
-        await SaveChangesAsync();
+        await _context.SaveChangesAsync();
         // return hand
         return hand;
     }
 
-    // Update an existing hand
+    /// <summary>
+    /// Update an existing hand.
+    /// </summary>
     public async Task<Hand> UpdateHandAsync(Guid handId, Hand hand)
     {
         //check if hand does not exist add hand if it does
         var existingHand =
             await _context.Hands.FindAsync(handId)
-            ?? throw new KeyNotFoundException("Hand not found");
+            ?? throw new NotFoundException($"Hand with ID {handId} not found");
 
         // Update properties
         existingHand.Order = hand.Order;
@@ -124,19 +127,31 @@ public class HandRepository : IHandRepository
 
         // Update the hand in the context and save changes
         _context.Hands.Update(existingHand);
-        await SaveChangesAsync();
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException(
+                "The hand you are trying to update has been modified by another user. Please refresh and try again."
+            );
+        }
 
         // return newly updated hand
         return existingHand;
     }
 
-    // update specific properties of an existing hand
+    /// <summary>
+    /// Partially update an existing hand.
+    /// </summary>
     public async Task<Hand> PatchHandAsync(Guid handId, int? Order = null, int? Bet = null)
     {
         // Check if hand exists and retrieve it
         var existingHand =
             await _context.Hands.FindAsync(handId)
-            ?? throw new KeyNotFoundException("Hand not found");
+            ?? throw new NotFoundException($"Hand with ID {handId} not found");
 
         // Update properties if provided
         existingHand.Order = Order ?? existingHand.Order;
@@ -144,32 +159,47 @@ public class HandRepository : IHandRepository
 
         // Update the hand in the context and save changes
         _context.Hands.Update(existingHand);
-        await SaveChangesAsync();
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException(
+                "The hand you are trying to update has been modified by another user. Please refresh and try again."
+            );
+        }
 
         // Return the updated hand
         return existingHand;
     }
 
-    // Delete an existing hand
+    /// <summary>
+    /// Delete a hand by its ID.
+    /// </summary>
     public async Task<Hand> DeleteHandAsync(Guid handId)
     {
         // Check if hand exists and retrieve it
         var existingHand =
             await _context.Hands.FindAsync(handId)
-            ?? throw new KeyNotFoundException("Hand not found");
+            ?? throw new NotFoundException($"Hand with ID {handId} not found");
 
         // Remove the hand from the context and save changes
         _context.Hands.Remove(existingHand);
-        await SaveChangesAsync();
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException(
+                "The hand you are trying to update has been modified by another user. Please refresh and try again."
+            );
+        }
 
         // Return the deleted hand
         return existingHand;
-    }
-
-    // Save changes to the database
-    public async Task SaveChangesAsync()
-    {
-        // Save changes to the database
-        await _context.SaveChangesAsync();
     }
 }

@@ -7,30 +7,30 @@ namespace Project.Api.Utilities.Extensions;
 public static class RoomExtensions
 {
     public static async Task<string> GetOrCreateDeckId(
-        this Room room,
+        this Game game,
         IDeckApiService deckApiService,
-        IRoomRepository roomRepository,
+        IGameRepository gameRepository,
         ILogger? logger = null
     )
     {
-        if (room.DeckId == null)
+        if (game.DeckId == null)
         {
             logger?.LogError(
                 "Warning: Room {RoomId} has no deck ID. Attempting to create a new one...",
-                room.Id
+                game.Id
             );
 
             // create new deck
-            room.DeckId = await deckApiService.CreateDeck();
-            await roomRepository.UpdateAsync(room);
+            game.DeckId = await deckApiService.CreateDeck();
+            await gameRepository.UpdateGameAsync(game);
 
             logger?.LogInformation(
                 "Successfully created new deck {DeckId} for room {RoomId}!",
-                room.DeckId,
-                room.Id
+                game.DeckId,
+                game.Id
             );
         }
 
-        return room.DeckId;
+        return game.DeckId;
     }
 }
