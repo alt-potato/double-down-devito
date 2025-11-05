@@ -1,10 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Project.Api.Models.Interfaces;
 
 namespace Project.Api.Models;
 
-public class User
+public class User : IEntity<Guid>, ITimestamped
 {
     public User()
     {
@@ -28,6 +29,10 @@ public class User
     public ICollection<RoomPlayer> RoomPlayers { get; set; } = [];
 
     public ICollection<GamePlayer> GamePlayers { get; set; } = [];
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset UpdatedAt { get; set; }
 
     public byte[] RowVersion { get; set; } = []; // concurrency
 }

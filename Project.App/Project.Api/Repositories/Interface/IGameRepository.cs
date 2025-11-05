@@ -7,53 +7,54 @@ public interface IGameRepository
     /// <summary>
     /// Get a game by its ID.
     /// </summary>
-    Task<Game?> GetGameByIdAsync(Guid id);
+    Task<Game?> GetByIdAsync(Guid id);
 
     /// <summary>
     /// Get all games with optional filtering parameters.
     /// </summary>
-    Task<List<Game>> GetGamesAsync(
+    Task<IReadOnlyList<Game>> GetAllAsync(
         string? gameMode = null,
-        bool? isActive = null,
-        int? minPlayers = null,
-        int? maxPlayers = null,
-        DateTimeOffset? createdAfter = null,
         DateTimeOffset? createdBefore = null,
-        string? search = null
+        DateTimeOffset? createdAfter = null,
+        DateTimeOffset? startedBefore = null,
+        DateTimeOffset? startedAfter = null,
+        bool? hasEnded = null,
+        int? skip = null,
+        int? take = null
     );
 
     /// <summary>
     /// Create a new game.
     /// </summary>
-    Task<Game> CreateGameAsync(Game game);
+    Task<Game> CreateAsync(Game game);
 
     /// <summary>
     /// Update an existing game.
     /// </summary>
-    Task<Game> UpdateGameAsync(Game game);
+    Task<Game> UpdateAsync(Game game);
 
     /// <summary>
     /// Delete a game by its ID.
     /// </summary>
-    Task<Game> DeleteGameAsync(Guid id);
+    Task<Game> DeleteAsync(Guid id);
 
     /// <summary>
     /// Check if a game exists by its ID.
     /// </summary>
-    Task<bool> GameExistsAsync(Guid id);
+    Task<bool> ExistsAsync(Guid id);
 
     /// <summary>
     /// Update game state.
     /// </summary>
-    Task<Game> UpdateGameStateAsync(Guid id, string gameState);
+    Task<Game> UpdateGamestateAsync(Guid id, string gameState);
 
     /// <summary>
     /// Update game round.
     /// </summary>
-    Task<Game> UpdateGameRoundAsync(Guid id, int round);
+    Task<Game> UpdateRoundAsync(Guid id, int round);
 
     /// <summary>
     /// Update game deck ID.
     /// </summary>
-    Task<Game> UpdateGameDeckIdAsync(Guid id, string deckId);
+    Task<Game> UpdateDeckIdAsync(Guid id, string deckId);
 }

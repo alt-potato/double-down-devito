@@ -10,8 +10,8 @@ This is a living document open to discussion! Make a pull request!
 
 ### Repository layer
 
-- Methods should be consistently named in the format `{verb}{noun}By{query parameters}Async`.
-  - eg. `GetUser`, `GetHandByIdAsync`, `GetHandsByGameIdAsync`
+- Methods should be consistently named in the format `{verb}(All)(By{query parameters})Async`.
+  - eg. `GetAsync`, `GetByIdAsync`, `GetByGameIdAsync`
 - Methods that return a collection of entities should use a `List<T>` or `IReadOnlyList<T>`.
 - The way a repository signals an entity was not found should be consistent.
   - For queries that retrieve entities (Get, Find, etc.):

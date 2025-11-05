@@ -2,123 +2,50 @@ using Microsoft.EntityFrameworkCore;
 using Project.Api.Data;
 using Project.Api.Models;
 using Project.Api.Repositories.Interface;
-using Project.Api.Utilities;
 
 namespace Project.Api.Repositories;
 
-public class UserRepository(AppDbContext context) : IUserRepository
+public class UserRepository(AppDbContext context, ILogger<UserRepository> logger)
+    : Repository<User>(context, logger),
+        IUserRepository
 {
-    private readonly AppDbContext _context = context;
-
     /// <summary>
     /// Get all users.
     /// </summary>
-    public async Task<List<User>> GetAllUsersAsync()
-    {
-        return await _context.Users.ToListAsync();
-    }
+    public async Task<IReadOnlyList<User>> GetAllAsync(int? skip = null, int? take = null) =>
+        await GetAllAsync(skip: skip, take: take);
 
     /// <summary>
     /// Get a user by their ID. Returns a read-only user.
     /// </summary>
-    public async Task<User?> GetUserByIdAsync(Guid id)
-    {
-        return await _context.Users.FindAsync(id);
-    }
+    public async Task<User?> GetByIdAsync(Guid id) => await GetAsync(id);
 
     /// <summary>
     /// Get a user by their email.
     /// </summary>
-    public async Task<User?> GetUserByEmailAsync(string email)
-    {
-        var normalized = email.Trim().ToLower(); // normalize emails to lowercase
-        return await _context
-            .Users.AsNoTracking() // don't track changes
-            .FirstOrDefaultAsync(u => u.Email == normalized);
-    }
+    public async Task<User?> GetByEmailAsync(string email) =>
+        await _context.Users.FirstOrDefaultAsync(u =>
+            u.Email.Equals(email.Trim(), StringComparison.InvariantCultureIgnoreCase)
+        );
 
     /// <summary>
     /// Create a new user.
     /// </summary>
-    public async Task<User> CreateUserAsync(User user)
-    {
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-        return user;
-    }
+    public new async Task<User> CreateAsync(User user) => await CreateAsync(user);
 
     /// <summary>
     /// Update an existing user.
     /// </summary>
-    public async Task<User> UpdateUserAsync(User user)
-    {
-        var existingUser =
-            await _context.Users.FindAsync(user.Id)
-            ?? throw new NotFoundException($"User with ID {user.Id} not found");
-
-        _context.Entry(existingUser).CurrentValues.SetValues(user);
-
-        try
-        {
-            await _context.SaveChangesAsync();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new ConflictException(
-                "The user you are trying to update has been modified by another user. Please refresh and try again."
-            );
-        }
-
-        return existingUser;
-    }
+    public new async Task<User> UpdateAsync(User user) => await UpdateAsync(user);
 
     /// <summary>
     /// Update user balance.
     /// </summary>
-    public async Task<User> UpdateUserBalanceAsync(Guid id, double balance)
-    {
-        var existingUser =
-            await _context.Users.FindAsync(id)
-            ?? throw new NotFoundException($"User with ID {id} not found");
-
-        existingUser.Balance = balance;
-
-        try
-        {
-            await _context.SaveChangesAsync();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new ConflictException(
-                "The user you are trying to update has been modified by another user. Please refresh and try again."
-            );
-        }
-
-        return existingUser;
-    }
+    public async Task<User> UpdateBalanceAsync(Guid id, double balance) =>
+        await UpdateAsync(id, u => u.Balance = balance);
 
     /// <summary>
     /// Delete a user by their ID.
     /// </summary>
-    public async Task<User> DeleteUserAsync(Guid id)
-    {
-        var existingUser =
-            await _context.Users.FindAsync(id)
-            ?? throw new NotFoundException($"User with ID {id} not found");
-
-        _context.Users.Remove(existingUser);
-
-        try
-        {
-            await _context.SaveChangesAsync();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new ConflictException(
-                "The user you are trying to update has been modified by another user. Please refresh and try again."
-            );
-        }
-
-        return existingUser;
-    }
+    public new async Task<User> DeleteAsync(Guid id) => await DeleteAsync(id);
 }

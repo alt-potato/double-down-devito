@@ -22,7 +22,7 @@ public static class RoomExtensions
 
             // create new deck
             game.DeckId = await deckApiService.CreateDeck();
-            await gameRepository.UpdateGameAsync(game);
+            await gameRepository.UpdateAsync(game);
 
             logger?.LogInformation(
                 "Successfully created new deck {DeckId} for room {RoomId}!",

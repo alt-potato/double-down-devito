@@ -7,35 +7,35 @@ public interface IUserRepository
     /// <summary>
     /// Get all users.
     /// </summary>
-    Task<List<User>> GetAllUsersAsync();
+    Task<IReadOnlyList<User>> GetAllAsync(int? skip = null, int? take = null);
 
     /// <summary>
     /// Get a user by their ID.
     /// </summary>
-    Task<User?> GetUserByIdAsync(Guid id);
+    Task<User?> GetByIdAsync(Guid id);
 
     /// <summary>
     /// Get a user by their email.
     /// </summary>
-    Task<User?> GetUserByEmailAsync(string email);
+    Task<User?> GetByEmailAsync(string email);
 
     /// <summary>
     /// Create a new user.
     /// </summary>
-    Task<User> CreateUserAsync(User user);
+    Task<User> CreateAsync(User user);
 
     /// <summary>
     /// Update an existing user.
     /// </summary>
-    Task<User> UpdateUserAsync(User user);
+    Task<User> UpdateAsync(User user);
 
     /// <summary>
     /// Update user balance.
     /// </summary>
-    Task<User> UpdateUserBalanceAsync(Guid id, double balance);
+    Task<User> UpdateBalanceAsync(Guid id, double balance);
 
     /// <summary>
     /// Delete a user by their ID.
     /// </summary>
-    Task<User> DeleteUserAsync(Guid id);
+    Task<User> DeleteAsync(Guid id);
 }

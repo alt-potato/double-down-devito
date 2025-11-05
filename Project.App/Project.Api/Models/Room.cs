@@ -6,7 +6,7 @@ using Project.Api.Models.Interfaces;
 
 namespace Project.Api.Models;
 
-public class Room : ITimestamped
+public class Room : IEntity<Guid>, ITimestamped
 {
     public Room()
     {

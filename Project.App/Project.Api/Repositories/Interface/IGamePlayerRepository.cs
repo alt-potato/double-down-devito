@@ -7,35 +7,43 @@ public interface IGamePlayerRepository
     /// <summary>
     /// Get a game player by game ID and user ID.
     /// </summary>
-    Task<GamePlayer?> GetGamePlayerByGameIdAndUserIdAsync(Guid gameId, Guid userId);
+    Task<GamePlayer?> GetByGameIdAndUserIdAsync(Guid gameId, Guid userId);
 
     /// <summary>
     /// Get all game players in a game.
     /// </summary>
-    Task<List<GamePlayer>> GetGamePlayersByGameIdAsync(Guid gameId);
+    Task<IReadOnlyList<GamePlayer>> GetAllByGameIdAsync(
+        Guid gameId,
+        int? skip = null,
+        int? take = null
+    );
 
     /// <summary>
     /// Get all games for a user.
     /// </summary>
-    Task<List<GamePlayer>> GetGamePlayersByUserIdAsync(Guid userId);
+    Task<IReadOnlyList<GamePlayer>> GetAllByUserIdAsync(
+        Guid userId,
+        int? skip = null,
+        int? take = null
+    );
 
     /// <summary>
     /// Create a new game player.
     /// </summary>
-    Task<GamePlayer> CreateGamePlayerAsync(GamePlayer gamePlayer);
+    Task<GamePlayer> CreateAsync(GamePlayer gamePlayer);
 
     /// <summary>
     /// Update an existing game player.
     /// </summary>
-    Task<GamePlayer> UpdateGamePlayerAsync(Guid gameId, Guid userId, GamePlayer gamePlayer);
+    Task<GamePlayer> UpdateAsync(GamePlayer gamePlayer);
 
     /// <summary>
     /// Update game player balance.
     /// </summary>
-    Task<GamePlayer> UpdateGamePlayerBalanceAsync(Guid gameId, Guid userId, long balanceDelta);
+    Task<GamePlayer> UpdateBalanceAsync(Guid gameId, Guid userId, long balanceDelta);
 
     /// <summary>
     /// Delete a game player.
     /// </summary>
-    Task<GamePlayer> DeleteGamePlayerAsync(Guid gameId, Guid userId);
+    Task<GamePlayer> DeleteAsync(Guid gameId, Guid userId);
 }

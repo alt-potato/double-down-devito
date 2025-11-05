@@ -5,7 +5,7 @@ using Project.Api.Models.Interfaces;
 
 namespace Project.Api.Models;
 
-public class Game : ITimestamped
+public class Game : IEntity<Guid>, ITimestamped
 {
     public Game()
     {

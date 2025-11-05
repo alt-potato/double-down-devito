@@ -1,11 +1,11 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Project.Api.Models.Interfaces;
 
 namespace Project.Api.Models;
 
-public class Hand
+public class Hand : IEntity<Guid>
 {
     public Hand()
     {

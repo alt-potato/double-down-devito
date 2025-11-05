@@ -7,45 +7,45 @@ public interface IRoomRepository
     /// <summary>
     /// Get a room by its ID.
     /// </summary>
-    Task<Room?> GetRoomByIdAsync(Guid id);
+    Task<Room?> GetByIdAsync(Guid id);
 
     /// <summary>
     /// Get all rooms.
     /// </summary>
-    Task<List<Room>> GetAllRoomsAsync();
+    Task<IReadOnlyList<Room>> GetAllAsync(int? skip = null, int? take = null);
 
     /// <summary>
     /// Get all active rooms.
     /// </summary>
-    Task<List<Room>> GetActiveRoomsAsync();
+    Task<IReadOnlyList<Room>> GetAllActiveAsync();
 
     /// <summary>
     /// Get all public rooms.
     /// </summary>
-    Task<List<Room>> GetPublicRoomsAsync();
+    Task<IReadOnlyList<Room>> GetAllPublicAsync();
 
     /// <summary>
     /// Get a room by host ID.
     /// </summary>
-    Task<Room?> GetRoomByHostIdAsync(Guid hostId);
+    Task<Room?> GetByHostIdAsync(Guid hostId);
 
     /// <summary>
     /// Create a new room.
     /// </summary>
-    Task<Room> CreateRoomAsync(Room room);
+    Task<Room> CreateAsync(Room room);
 
     /// <summary>
     /// Update an existing room.
     /// </summary>
-    Task<Room> UpdateRoomAsync(Room room);
+    Task<Room> UpdateAsync(Room room);
 
     /// <summary>
     /// Delete a room by its ID.
     /// </summary>
-    Task<Room> DeleteRoomAsync(Guid id);
+    Task<Room> DeleteAsync(Guid id);
 
     /// <summary>
     /// Check if a room exists by its ID.
     /// </summary>
-    Task<bool> RoomExistsAsync(Guid id);
+    Task<bool> ExistsAsync(Guid id);
 }

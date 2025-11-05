@@ -99,7 +99,7 @@ public static class BlackjackCardExtensions
                 state,
                 jsonOptions ?? ApiJsonSerializerOptions.DefaultOptions
             );
-            await gameRepository.UpdateGameStateAsync(roomId, updatedGameState);
+            await gameRepository.UpdateGamestateAsync(roomId, updatedGameState);
         }
 
         if (roomSSEService is not null)
