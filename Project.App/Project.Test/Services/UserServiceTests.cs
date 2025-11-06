@@ -1,56 +1,47 @@
 ﻿using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Project.Api.Models;
-using Project.Api.Repositories.Interface;
 using Project.Api.Services;
+using Project.Api.Utilities;
 using Project.Test.Helpers;
+using Project.Test.Helpers.Builders;
 
 namespace Project.Test.Services;
 
-public class UserServiceTest
+public class UserServiceTests : ServiceTestBase<UserService>
 {
-    private readonly UserService _service;
-    private readonly Mock<IUserRepository> _userRepositoryMock;
-    private readonly Mock<ILogger<UserService>> _loggerMock;
+    private readonly UserService _sut; // service under test
 
-    public UserServiceTest()
+    public UserServiceTests()
     {
-        _userRepositoryMock = new Mock<IUserRepository>();
-        _loggerMock = new Mock<ILogger<UserService>>();
-        _service = new UserService(_userRepositoryMock.Object, _loggerMock.Object);
+        _sut = new UserService(_mockUoW.Object, _mockLogger.Object);
     }
 
     [Fact]
     public async Task GetAllUsers_ReturnsAllUsers_WhenSuccessful()
     {
         // Arrange
-        var users = new List<User>
-        {
-            RepositoryTestHelper.CreateTestUser(),
-            RepositoryTestHelper.CreateTestUser(),
-            RepositoryTestHelper.CreateTestUser(),
-        };
-        _userRepositoryMock.Setup(r => r.GetAllAsync()).ReturnsAsync(users);
+        var users = new List<User> { new UserBuilder(), new UserBuilder(), new UserBuilder() };
+        _mockUserRepository.Setup(r => r.GetAllAsync(null, null)).ReturnsAsync(users);
 
         // Act
-        var result = await _service.GetAllUsersAsync();
+        var result = await _sut.GetAllUsersAsync();
 
         // Assert
         result.Should().BeEquivalentTo(users);
-        _userRepositoryMock.Verify(r => r.GetAllAsync(), Times.Once);
+        _mockUserRepository.Verify(r => r.GetAllAsync(null, null), Times.Once);
     }
 
     [Fact]
     public async Task GetAllUsers_ThrowsException_WhenRepositoryFails()
     {
         // Arrange
-        _userRepositoryMock
-            .Setup(r => r.GetAllAsync())
+        _mockUserRepository
+            .Setup(r => r.GetAllAsync(null, null))
             .ThrowsAsync(new Exception("Database error"));
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => _service.GetAllUsersAsync());
+        await Assert.ThrowsAsync<Exception>(_sut.GetAllUsersAsync);
     }
 
     [Fact]
@@ -58,15 +49,15 @@ public class UserServiceTest
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var user = RepositoryTestHelper.CreateTestUser(id: userId);
-        _userRepositoryMock.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(user);
+        var user = new UserBuilder().WithId(userId).Build();
+        _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(user);
 
         // Act
-        var result = await _service.GetUserByIdAsync(userId);
+        var result = await _sut.GetUserByIdAsync(userId);
 
         // Assert
         result.Should().BeEquivalentTo(user);
-        _userRepositoryMock.Verify(r => r.GetByIdAsync(userId), Times.Once);
+        _mockUserRepository.Verify(r => r.GetByIdAsync(userId), Times.Once);
     }
 
     [Fact]
@@ -74,12 +65,12 @@ public class UserServiceTest
     {
         // Arrange
         var userId = Guid.NewGuid();
-        _userRepositoryMock
+        _mockUserRepository
             .Setup(r => r.GetByIdAsync(userId))
             .ThrowsAsync(new Exception("Database error"));
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => _service.GetUserByIdAsync(userId));
+        await Assert.ThrowsAsync<Exception>(() => _sut.GetUserByIdAsync(userId));
     }
 
     [Fact]
@@ -87,15 +78,15 @@ public class UserServiceTest
     {
         // Arrange
         var email = "test@example.com";
-        var user = RepositoryTestHelper.CreateTestUser(email: email);
-        _userRepositoryMock.Setup(r => r.GetByEmailAsync(email)).ReturnsAsync(user);
+        var user = new UserBuilder().WithEmail(email).Build();
+        _mockUserRepository.Setup(r => r.GetByEmailAsync(email)).ReturnsAsync(user);
 
         // Act
-        var result = await _service.GetUserByEmailAsync(email);
+        var result = await _sut.GetUserByEmailAsync(email);
 
         // Assert
         result.Should().BeEquivalentTo(user);
-        _userRepositoryMock.Verify(r => r.GetByEmailAsync(email), Times.Once);
+        _mockUserRepository.Verify(r => r.GetByEmailAsync(email), Times.Once);
     }
 
     [Fact]
@@ -103,25 +94,27 @@ public class UserServiceTest
     {
         // Arrange
         var email = "test@example.com";
-        _userRepositoryMock
+        _mockUserRepository
             .Setup(r => r.GetByEmailAsync(email))
             .ThrowsAsync(new Exception("Database error"));
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => _service.GetUserByEmailAsync(email));
+        await Assert.ThrowsAsync<Exception>(() => _sut.GetUserByEmailAsync(email));
     }
 
     [Fact]
     public async Task CreateUser_ReturnsCreatedUser_WhenSuccessful()
     {
         // Arrange
-        var newUser = RepositoryTestHelper.CreateTestUser(name: "Danny", email: "danny@devito.net");
+        var newUser = new UserBuilder().WithName("Danny").WithEmail("danny@devito.net").Build();
 
         // Setup AddAsync to complete successfully
-        _userRepositoryMock.Setup(r => r.AddAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+        _mockUserRepository
+            .Setup(r => r.CreateAsync(It.IsAny<User>()))
+            .Returns(Task.FromResult(newUser));
 
         // Act
-        var result = await _service.CreateUserAsync(newUser);
+        var result = await _sut.CreateUserAsync(newUser);
 
         // Assert
         result.Should().NotBeNull();
@@ -129,8 +122,9 @@ public class UserServiceTest
         result.Email.Should().Be("danny@devito.net");
 
         // Verify AddAsync was called exactly once with the expected user
-        _userRepositoryMock.Verify(
-            r => r.AddAsync(It.Is<User>(u => u.Name == "Danny" && u.Email == "danny@devito.net")),
+        _mockUserRepository.Verify(
+            r =>
+                r.CreateAsync(It.Is<User>(u => u.Name == "Danny" && u.Email == "danny@devito.net")),
             Times.Once
         );
     }
@@ -140,17 +134,19 @@ public class UserServiceTest
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var user = RepositoryTestHelper.CreateTestUser(id: userId, name: "Updated Name");
-        _userRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+        var user = new UserBuilder().WithId(userId).WithName("Updated Name").Build();
+        _mockUserRepository
+            .Setup(r => r.UpdateAsync(It.IsAny<User>()))
+            .Returns(Task.FromResult(user));
 
         // Act
-        var result = await _service.UpdateUserAsync(userId, user);
+        var result = await _sut.UpdateUserAsync(userId, user);
 
         // Assert
         result.Should().NotBeNull();
         result.Id.Should().Be(userId);
         result.Name.Should().Be("Updated Name");
-        _userRepositoryMock.Verify(
+        _mockUserRepository.Verify(
             r => r.UpdateAsync(It.Is<User>(u => u.Id == userId && u.Name == "Updated Name")),
             Times.Once
         );
@@ -161,13 +157,13 @@ public class UserServiceTest
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var user = RepositoryTestHelper.CreateTestUser(id: userId);
-        _userRepositoryMock
+        var user = new UserBuilder().WithId(userId).WithName("Updated Name").Build();
+        _mockUserRepository
             .Setup(r => r.UpdateAsync(It.IsAny<User>()))
             .ThrowsAsync(new Exception("Database error"));
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => _service.UpdateUserAsync(userId, user));
+        await Assert.ThrowsAsync<Exception>(() => _sut.UpdateUserAsync(userId, user));
     }
 
     [Fact]
@@ -175,14 +171,15 @@ public class UserServiceTest
     {
         // Arrange
         var userId = Guid.NewGuid();
-        _userRepositoryMock.Setup(r => r.DeleteAsync(userId)).Returns(Task.CompletedTask);
+        var user = new UserBuilder().WithId(userId).WithName("Deleted User").Build();
+        _mockUserRepository.Setup(r => r.DeleteAsync(userId)).Returns(Task.FromResult(user));
 
         // Act
-        var result = await _service.DeleteUserAsync(userId);
+        var result = await _sut.DeleteUserAsync(userId);
 
         // Assert
         result.Should().BeTrue();
-        _userRepositoryMock.Verify(r => r.DeleteAsync(userId), Times.Once);
+        _mockUserRepository.Verify(r => r.DeleteAsync(userId), Times.Once);
     }
 
     [Fact]
@@ -190,12 +187,12 @@ public class UserServiceTest
     {
         // Arrange
         var userId = Guid.NewGuid();
-        _userRepositoryMock
+        _mockUserRepository
             .Setup(r => r.DeleteAsync(userId))
             .ThrowsAsync(new Exception("Database error"));
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => _service.DeleteUserAsync(userId));
+        await Assert.ThrowsAsync<Exception>(() => _sut.DeleteUserAsync(userId));
     }
 
     [Fact]
@@ -203,40 +200,37 @@ public class UserServiceTest
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var startingUser = RepositoryTestHelper.CreateTestUser(id: userId, balance: 1000.0);
+        var startingUser = new UserBuilder().WithId(userId).WithBalance(1000.0).Build();
         var newBalance = 2000.0;
+        var updatedUser = new UserBuilder().WithId(userId).WithBalance(newBalance).Build();
 
-        _userRepositoryMock.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(startingUser);
-
-        _userRepositoryMock
-            .Setup(r => r.UpdateBalanceAsync(It.IsAny<User>()))
-            .Returns(Task.CompletedTask);
+        _mockUserRepository.Setup(r => r.ExistsAsync(userId)).ReturnsAsync(true);
+        _mockUserRepository
+            .Setup(r => r.UpdateBalanceAsync(It.IsAny<Guid>(), It.IsAny<double>()))
+            .Returns(Task.FromResult(updatedUser));
 
         // Act
-        var result = await _service.UpdateUserBalanceAsync(userId, newBalance);
+        var result = await _sut.UpdateUserBalanceAsync(userId, newBalance);
 
         // Assert
         result.Should().NotBeNull();
         result!.Id.Should().Be(userId);
         result.Balance.Should().Be(newBalance);
 
-        _userRepositoryMock.Verify(r => r.GetByIdAsync(userId), Times.Once);
-        _userRepositoryMock.Verify(
-            r => r.UpdateBalanceAsync(It.Is<User>(u => u.Id == userId && u.Balance == newBalance)),
-            Times.Once
-        );
+        _mockUserRepository.Verify(r => r.ExistsAsync(userId), Times.Once);
+        _mockUserRepository.Verify(r => r.UpdateBalanceAsync(userId, newBalance), Times.Once);
     }
 
     [Fact]
-    public async Task UpdateUserBalance_ThrowsException_WhenUserNotFound()
+    public async Task UpdateUserBalance_ThrowsNotFoundException_WhenUserNotFound()
     {
         // Arrange
         var userId = Guid.NewGuid();
-        _userRepositoryMock.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync((User?)null);
+        _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync((User?)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() =>
-            _service.UpdateUserBalanceAsync(userId, 2000.0)
+        var exception = await Assert.ThrowsAsync<NotFoundException>(() =>
+            _sut.UpdateUserBalanceAsync(userId, 2000.0)
         );
         exception.Message.Should().Contain($"User {userId} not found");
     }
@@ -248,22 +242,29 @@ public class UserServiceTest
         var email = "test@gmail.com";
         var name = "Test User";
         var avatarUrl = "http://example.com/avatar.jpg";
+        var user = new UserBuilder()
+            .WithEmail(email)
+            .WithName(name)
+            .WithAvatarUrl(avatarUrl)
+            .Build();
 
-        _userRepositoryMock.Setup(r => r.GetByEmailAsync(email)).ReturnsAsync((User?)null);
+        _mockUserRepository.Setup(r => r.GetByEmailAsync(email)).ReturnsAsync((User?)null);
 
-        _userRepositoryMock.Setup(r => r.AddAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+        _mockUserRepository
+            .Setup(r => r.CreateAsync(It.IsAny<User>()))
+            .Returns(Task.FromResult(user));
 
         // Act
-        var result = await _service.UpsertGoogleUserByEmailAsync(email, name, avatarUrl);
+        var result = await _sut.UpsertGoogleUserByEmailAsync(email, name, avatarUrl);
 
         // Assert
         result.Should().NotBeNull();
         result.Email.Should().Be(email);
         result.Name.Should().Be(name);
         result.AvatarUrl.Should().Be(avatarUrl);
-        _userRepositoryMock.Verify(
+        _mockUserRepository.Verify(
             r =>
-                r.AddAsync(
+                r.CreateAsync(
                     It.Is<User>(u => u.Email == email && u.Name == name && u.AvatarUrl == avatarUrl)
                 ),
             Times.Once
@@ -275,27 +276,29 @@ public class UserServiceTest
     {
         // Arrange
         var email = "test@gmail.com";
-        var existingUser = RepositoryTestHelper.CreateTestUser(
-            email: email,
-            name: "Old Name",
-            avatarUrl: "old-avatar.jpg"
-        );
+        var existingUser = new UserBuilder()
+            .WithEmail(email)
+            .WithName("Old Name")
+            .WithAvatarUrl("old-avatar.jpg")
+            .Build();
         var newName = "New Name";
         var newAvatarUrl = "new-avatar.jpg";
 
-        _userRepositoryMock.Setup(r => r.GetByEmailAsync(email)).ReturnsAsync(existingUser);
+        _mockUserRepository.Setup(r => r.GetByEmailAsync(email)).ReturnsAsync(existingUser);
 
-        _userRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+        _mockUserRepository
+            .Setup(r => r.UpdateAsync(It.IsAny<User>()))
+            .Returns(Task.FromResult(existingUser));
 
         // Act
-        var result = await _service.UpsertGoogleUserByEmailAsync(email, newName, newAvatarUrl);
+        var result = await _sut.UpsertGoogleUserByEmailAsync(email, newName, newAvatarUrl);
 
         // Assert
         result.Should().NotBeNull();
         result.Email.Should().Be(email);
         result.Name.Should().Be(newName);
         result.AvatarUrl.Should().Be(newAvatarUrl);
-        _userRepositoryMock.Verify(
+        _mockUserRepository.Verify(
             r =>
                 r.UpdateAsync(
                     It.Is<User>(u =>
@@ -313,13 +316,20 @@ public class UserServiceTest
         var email = "test@gmail.com";
         string? name = null;
         var avatarUrl = "http://example.com/avatar.jpg";
+        var user = new UserBuilder()
+            .WithEmail(email)
+            .WithName(email)
+            .WithAvatarUrl(avatarUrl)
+            .Build();
 
-        _userRepositoryMock.Setup(r => r.GetByEmailAsync(email)).ReturnsAsync((User?)null);
+        _mockUserRepository.Setup(r => r.GetByEmailAsync(email)).ReturnsAsync((User?)null);
 
-        _userRepositoryMock.Setup(r => r.AddAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+        _mockUserRepository
+            .Setup(r => r.CreateAsync(It.IsAny<User>()))
+            .Returns(Task.FromResult(user));
 
         // Act
-        var result = await _service.UpsertGoogleUserByEmailAsync(email, name, avatarUrl);
+        var result = await _sut.UpsertGoogleUserByEmailAsync(email, name, avatarUrl);
 
         // Assert
         result.Should().NotBeNull();
