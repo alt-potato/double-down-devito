@@ -20,13 +20,7 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
         Room room = await SeedData(
             new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
         );
-        await SeedData(
-            new RoomPlayerBuilder()
-                .WithRoomId(room.Id)
-                .WithUserId(user.Id)
-                .WithStatus(Status.Active)
-                .Build()
-        );
+        await SeedData(new RoomPlayerBuilder().WithRoomId(room.Id).WithUserId(user.Id).Build());
 
         // Act
         var result = await _rut.GetByRoomIdAndUserIdAsync(room.Id, user.Id);
@@ -35,7 +29,6 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
         Assert.NotNull(result);
         Assert.Equal(room.Id, result.RoomId);
         Assert.Equal(user.Id, result.UserId);
-        Assert.Equal(Status.Active, result.Status);
     }
 
     [Fact]
@@ -66,16 +59,8 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
         );
 
         await SeedData(
-            new RoomPlayerBuilder()
-                .WithRoomId(room1.Id)
-                .WithUserId(user1.Id)
-                .WithStatus(Status.Active)
-                .Build(),
-            new RoomPlayerBuilder()
-                .WithRoomId(room2.Id)
-                .WithUserId(user2.Id)
-                .WithStatus(Status.Active)
-                .Build()
+            new RoomPlayerBuilder().WithRoomId(room1.Id).WithUserId(user1.Id).Build(),
+            new RoomPlayerBuilder().WithRoomId(room2.Id).WithUserId(user2.Id).Build()
         );
 
         // Act
@@ -113,21 +98,9 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
         );
 
         await SeedData(
-            new RoomPlayerBuilder()
-                .WithRoomId(room1.Id)
-                .WithUserId(user1.Id)
-                .WithStatus(Status.Active)
-                .Build(),
-            new RoomPlayerBuilder()
-                .WithRoomId(room1.Id)
-                .WithUserId(user2.Id)
-                .WithStatus(Status.Active)
-                .Build(),
-            new RoomPlayerBuilder()
-                .WithRoomId(room2.Id)
-                .WithUserId(user1.Id)
-                .WithStatus(Status.Active)
-                .Build()
+            new RoomPlayerBuilder().WithRoomId(room1.Id).WithUserId(user1.Id).Build(),
+            new RoomPlayerBuilder().WithRoomId(room1.Id).WithUserId(user2.Id).Build(),
+            new RoomPlayerBuilder().WithRoomId(room2.Id).WithUserId(user1.Id).Build()
         );
 
         // Act
@@ -174,18 +147,9 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
         );
 
         await SeedData<RoomPlayer>(
-            new RoomPlayerBuilder()
-                .WithRoomId(room1.Id)
-                .WithUserId(user1.Id)
-                .WithStatus(Status.Active),
-            new RoomPlayerBuilder()
-                .WithRoomId(room2.Id)
-                .WithUserId(user1.Id)
-                .WithStatus(Status.Active),
-            new RoomPlayerBuilder()
-                .WithRoomId(room1.Id)
-                .WithUserId(user2.Id)
-                .WithStatus(Status.Active)
+            new RoomPlayerBuilder().WithRoomId(room1.Id).WithUserId(user1.Id),
+            new RoomPlayerBuilder().WithRoomId(room2.Id).WithUserId(user1.Id),
+            new RoomPlayerBuilder().WithRoomId(room1.Id).WithUserId(user2.Id)
         );
 
         // Act
@@ -194,51 +158,6 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
         // Assert
         Assert.Equal(2, result.Count);
         Assert.All(result, rp => Assert.Equal(user1.Id, rp.UserId));
-    }
-
-    [Fact]
-    public async Task GetAllInRoomByStatusAsync_ReturnsPlayersByStatus()
-    {
-        // Arrange
-        var user1 = await SeedData(
-            new UserBuilder().WithEmail("user1@test.com").WithName("User 1").Build()
-        );
-        var user2 = await SeedData(
-            new UserBuilder().WithEmail("user2@test.com").WithName("User 2").Build()
-        );
-        var user3 = await SeedData(
-            new UserBuilder().WithEmail("user3@test.com").WithName("User 3").Build()
-        );
-        var room = await SeedData(
-            new RoomBuilder().WithHostId(user1.Id).WithDescription("Test Room").Build()
-        );
-
-        await SeedData(
-            new RoomPlayerBuilder()
-                .WithRoomId(room.Id)
-                .WithUserId(user1.Id)
-                .WithStatus(Status.Active)
-                .Build(),
-            new RoomPlayerBuilder()
-                .WithRoomId(room.Id)
-                .WithUserId(user2.Id)
-                .WithStatus(Status.Inactive)
-                .Build(),
-            new RoomPlayerBuilder()
-                .WithRoomId(room.Id)
-                .WithUserId(user3.Id)
-                .WithStatus(Status.Away)
-                .Build()
-        );
-
-        // Act
-        var result = await _rut.GetAllInRoomByStatusAsync(room.Id, Status.Active, Status.Away);
-
-        // Assert
-        Assert.Equal(2, result.Count);
-        Assert.Contains(result, rp => rp.UserId == user1.Id && rp.Status == Status.Active);
-        Assert.Contains(result, rp => rp.UserId == user3.Id && rp.Status == Status.Away);
-        Assert.DoesNotContain(result, rp => rp.UserId == user2.Id);
     }
 
     [Fact]
@@ -251,20 +170,14 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
         var room = await SeedData(
             new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
         );
-        var roomPlayer = new RoomPlayerBuilder()
-            .WithRoomId(room.Id)
-            .WithUserId(user.Id)
-            .WithStatus(Status.Active)
-            .Build();
 
         // Act
-        var result = await _rut.CreateAsync(roomPlayer);
+        var result = await _rut.AddAsync(room.Id, user.Id);
 
         // Assert
         Assert.NotNull(result);
         Assert.Equal(room.Id, result.RoomId);
         Assert.Equal(user.Id, result.UserId);
-        Assert.Equal(Status.Active, result.Status);
         Assert.True(
             await _context.RoomPlayers.AnyAsync(rp => rp.RoomId == room.Id && rp.UserId == user.Id)
         );
@@ -281,17 +194,12 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
             new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
         );
         var roomPlayer = await SeedData(
-            new RoomPlayerBuilder()
-                .WithRoomId(room.Id)
-                .WithUserId(user.Id)
-                .WithStatus(Status.Active)
-                .Build()
+            new RoomPlayerBuilder().WithRoomId(room.Id).WithUserId(user.Id).Build()
         );
 
         var updatedRoomPlayer = new RoomPlayerBuilder()
             .WithRoomId(room.Id)
             .WithUserId(user.Id)
-            .WithStatus(Status.Inactive)
             .Build();
 
         // Act
@@ -299,7 +207,6 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(Status.Inactive, result.Status);
     }
 
     [Fact]
@@ -313,11 +220,7 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
             new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
         );
         var roomPlayer = await SeedData(
-            new RoomPlayerBuilder()
-                .WithRoomId(room.Id)
-                .WithUserId(user.Id)
-                .WithStatus(Status.Active)
-                .Build()
+            new RoomPlayerBuilder().WithRoomId(room.Id).WithUserId(user.Id).Build()
         );
 
         // Act
@@ -368,16 +271,8 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
         );
 
         await SeedData(
-            new RoomPlayerBuilder()
-                .WithRoomId(room.Id)
-                .WithUserId(user1.Id)
-                .WithStatus(Status.Active)
-                .Build(),
-            new RoomPlayerBuilder()
-                .WithRoomId(room.Id)
-                .WithUserId(user2.Id)
-                .WithStatus(Status.Active)
-                .Build()
+            new RoomPlayerBuilder().WithRoomId(room.Id).WithUserId(user1.Id).Build(),
+            new RoomPlayerBuilder().WithRoomId(room.Id).WithUserId(user2.Id).Build()
         );
 
         // Act
@@ -403,44 +298,5 @@ public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository
 
         // Assert
         Assert.Equal(0, result);
-    }
-
-    [Fact]
-    public async Task UpdatePlayerStatusAsync_UpdatesStatusSuccessfully()
-    {
-        // Arrange
-        var user = await SeedData(
-            new UserBuilder().WithEmail("test@example.com").WithName("Test User").Build()
-        );
-        var room = await SeedData(
-            new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
-        );
-        var roomPlayer = await SeedData(
-            new RoomPlayerBuilder()
-                .WithRoomId(room.Id)
-                .WithUserId(user.Id)
-                .WithStatus(Status.Active)
-                .Build()
-        );
-
-        // Act
-        var result = await _rut.UpdatePlayerStatusAsync(
-            roomPlayer.RoomId,
-            roomPlayer.UserId,
-            Status.Inactive
-        );
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(Status.Inactive, result.Status);
-    }
-
-    [Fact]
-    public async Task UpdatePlayerStatusAsync_ThrowsNotFoundException_WhenRoomPlayerDoesNotExist()
-    {
-        // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() =>
-            _rut.UpdatePlayerStatusAsync(Guid.NewGuid(), Guid.NewGuid(), Status.Active)
-        );
     }
 }

@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Project.Api.Models.Interface;
-using Project.Api.Utilities.Enums;
 
 namespace Project.Api.Models;
 
@@ -15,8 +14,6 @@ public class RoomPlayer : ICompositeEntity<Guid, Guid>
 
     public virtual Room? Room { get; set; } // navigation
     public virtual User? User { get; set; } // navigation
-
-    public Status Status { get; set; } = Status.Active;
 
     public byte[] RowVersion { get; set; } = []; // concurrency
 }

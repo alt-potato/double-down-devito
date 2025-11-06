@@ -14,7 +14,6 @@ public class RoomPlayerBuilder : IBuilder<RoomPlayer>
         {
             RoomId = Guid.CreateVersion7(),
             UserId = Guid.CreateVersion7(),
-            Status = Status.Active,
         };
     }
 
@@ -27,12 +26,6 @@ public class RoomPlayerBuilder : IBuilder<RoomPlayer>
     public RoomPlayerBuilder WithUserId(Guid userId)
     {
         _roomPlayer.UserId = userId;
-        return this;
-    }
-
-    public RoomPlayerBuilder WithStatus(Status status)
-    {
-        _roomPlayer.Status = status;
         return this;
     }
 

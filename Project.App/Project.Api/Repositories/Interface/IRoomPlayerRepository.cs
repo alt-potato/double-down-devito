@@ -1,5 +1,4 @@
 using Project.Api.Models;
-using Project.Api.Utilities.Enums;
 
 namespace Project.Api.Repositories.Interface;
 
@@ -34,17 +33,9 @@ public interface IRoomPlayerRepository
     );
 
     /// <summary>
-    /// Get players in a room by status.
+    /// Add a player to a room.
     /// </summary>
-    Task<IReadOnlyList<RoomPlayer>> GetAllInRoomByStatusAsync(
-        Guid roomId,
-        params Status[] statuses
-    );
-
-    /// <summary>
-    /// Create a new room player.
-    /// </summary>
-    Task<RoomPlayer> CreateAsync(RoomPlayer roomPlayer);
+    Task<RoomPlayer> AddAsync(Guid roomId, Guid userId);
 
     /// <summary>
     /// Update an existing room player.
@@ -65,9 +56,4 @@ public interface IRoomPlayerRepository
     /// Get the player count in a room.
     /// </summary>
     Task<int> GetPlayerCountAsync(Guid roomId);
-
-    /// <summary>
-    /// Update player status.
-    /// </summary>
-    Task<RoomPlayer> UpdatePlayerStatusAsync(Guid roomId, Guid userId, Status status);
 }

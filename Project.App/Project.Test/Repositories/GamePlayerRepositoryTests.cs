@@ -291,6 +291,170 @@ public class GamePlayerRepositoryTests : RepositoryTestBase<GamePlayerRepository
     }
 
     [Fact]
+    public async Task GetAllInRoomByStatusAsync_ReturnsCorrectPlayers_ForSingleStatus()
+    {
+        // Arrange
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user1 = await SeedData(
+            new UserBuilder().WithEmail("user1@test.com").WithName("User 1").Build()
+        );
+        var user2 = await SeedData(
+            new UserBuilder().WithEmail("user2@test.com").WithName("User 2").Build()
+        );
+        var user3 = await SeedData(
+            new UserBuilder().WithEmail("user3@test.com").WithName("User 3").Build()
+        );
+
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user1.Id)
+                .WithStatus(GamePlayer.PlayerStatus.Active)
+                .Build(),
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user2.Id)
+                .WithStatus(GamePlayer.PlayerStatus.Away)
+                .Build(),
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user3.Id)
+                .WithStatus(GamePlayer.PlayerStatus.Active)
+                .Build()
+        );
+
+        // Act
+        var result = await _rut.GetAllInRoomByStatusAsync(game.Id, GamePlayer.PlayerStatus.Active);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.All(result, gp => Assert.Equal(GamePlayer.PlayerStatus.Active, gp.Status));
+    }
+
+    [Fact]
+    public async Task GetAllInRoomByStatusAsync_ReturnsCorrectPlayers_ForMultipleStatuses()
+    {
+        // Arrange
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user1 = await SeedData(
+            new UserBuilder().WithEmail("user1@test.com").WithName("User 1").Build()
+        );
+        var user2 = await SeedData(
+            new UserBuilder().WithEmail("user2@test.com").WithName("User 2").Build()
+        );
+        var user3 = await SeedData(
+            new UserBuilder().WithEmail("user3@test.com").WithName("User 3").Build()
+        );
+        var user4 = await SeedData(
+            new UserBuilder().WithEmail("user4@test.com").WithName("User 4").Build()
+        );
+
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user1.Id)
+                .WithStatus(GamePlayer.PlayerStatus.Active)
+                .Build(),
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user2.Id)
+                .WithStatus(GamePlayer.PlayerStatus.Away)
+                .Build(),
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user3.Id)
+                .WithStatus(GamePlayer.PlayerStatus.Inactive)
+                .Build(),
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user4.Id)
+                .WithStatus(GamePlayer.PlayerStatus.Left)
+                .Build()
+        );
+
+        // Act
+        var result = await _rut.GetAllInRoomByStatusAsync(
+            game.Id,
+            GamePlayer.PlayerStatus.Away,
+            GamePlayer.PlayerStatus.Inactive
+        );
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, gp => gp.Status == GamePlayer.PlayerStatus.Away);
+        Assert.Contains(result, gp => gp.Status == GamePlayer.PlayerStatus.Inactive);
+    }
+
+    [Fact]
+    public async Task GetAllInRoomByStatusAsync_ReturnsEmptyList_WhenNoPlayersMatchStatus()
+    {
+        // Arrange
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user1 = await SeedData(
+            new UserBuilder().WithEmail("user1@test.com").WithName("User 1").Build()
+        );
+
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user1.Id)
+                .WithStatus(GamePlayer.PlayerStatus.Active)
+                .Build()
+        );
+
+        // Act
+        var result = await _rut.GetAllInRoomByStatusAsync(game.Id, GamePlayer.PlayerStatus.Away);
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task UpdatePlayerStatusAsync_UpdatesStatusSuccessfully()
+    {
+        // Arrange
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithStatus(GamePlayer.PlayerStatus.Active)
+                .Build()
+        );
+
+        // Act
+        var result = await _rut.UpdatePlayerStatusAsync(
+            game.Id,
+            user.Id,
+            GamePlayer.PlayerStatus.Inactive
+        );
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(GamePlayer.PlayerStatus.Inactive, result.Status);
+
+        var dbEntity = await _context.GamePlayers.FindAsync(game.Id, user.Id);
+        Assert.NotNull(dbEntity);
+        Assert.Equal(GamePlayer.PlayerStatus.Inactive, dbEntity.Status);
+    }
+
+    [Fact]
+    public async Task UpdatePlayerStatusAsync_ThrowsNotFoundException_WhenGamePlayerDoesNotExist()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            _rut.UpdatePlayerStatusAsync(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                GamePlayer.PlayerStatus.Away
+            )
+        );
+    }
+
+    [Fact]
     public async Task GetByGameIdAndUserIdAsync_IncludesGameAndUser()
     {
         // Arrange

@@ -28,6 +28,14 @@ public interface IGamePlayerRepository
     );
 
     /// <summary>
+    /// Get players in a game by status.
+    /// </summary>
+    Task<IReadOnlyList<GamePlayer>> GetAllInRoomByStatusAsync(
+        Guid roomId,
+        params GamePlayer.PlayerStatus[] statuses
+    );
+
+    /// <summary>
     /// Create a new game player.
     /// </summary>
     Task<GamePlayer> CreateAsync(GamePlayer gamePlayer);
@@ -41,6 +49,15 @@ public interface IGamePlayerRepository
     /// Update game player balance.
     /// </summary>
     Task<GamePlayer> UpdateBalanceAsync(Guid gameId, Guid userId, long balanceDelta);
+
+    /// <summary>
+    /// Update player status.
+    /// </summary>
+    Task<GamePlayer> UpdatePlayerStatusAsync(
+        Guid gameId,
+        Guid userId,
+        GamePlayer.PlayerStatus status
+    );
 
     /// <summary>
     /// Delete a game player.

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Project.Api.Models;
-using Project.Api.Models.Interfaces;
+using Project.Api.Models.Interface;
 
 namespace Project.Api.Data;
 

@@ -1,8 +1,6 @@
-using Microsoft.EntityFrameworkCore;
 using Project.Api.Data;
 using Project.Api.Models;
 using Project.Api.Repositories.Interface;
-using Project.Api.Utilities.Enums;
 
 namespace Project.Api.Repositories;
 
@@ -56,17 +54,16 @@ public class RoomPlayerRepository(AppDbContext context, ILogger<RoomPlayerReposi
     ) => GetAllAsync(r => r.UserId == userId, skip: skip, take: take);
 
     /// <summary>
-    /// Get players in a room by status.
-    /// </summary>
-    public Task<IReadOnlyList<RoomPlayer>> GetAllInRoomByStatusAsync(
-        Guid roomId,
-        params Status[] statuses
-    ) => GetAllAsync(r => r.RoomId == roomId && statuses.Contains(r.Status));
-
-    /// <summary>
     /// Create a new room player.
     /// </summary>
-    public new Task<RoomPlayer> CreateAsync(RoomPlayer roomPlayer) => base.CreateAsync(roomPlayer);
+    public Task<RoomPlayer> AddAsync(Guid roomId, Guid userId)
+    {
+        // confirm room exists
+
+        // confirm user exists
+
+        return base.CreateAsync(new RoomPlayer { RoomId = roomId, UserId = userId });
+    }
 
     /// <summary>
     /// Update an existing room player.
@@ -88,10 +85,4 @@ public class RoomPlayerRepository(AppDbContext context, ILogger<RoomPlayerReposi
     /// Get the player count in a room.
     /// </summary>
     public Task<int> GetPlayerCountAsync(Guid roomId) => CountAsync(r => r.RoomId == roomId);
-
-    /// <summary>
-    /// Update player status.
-    /// </summary>
-    public Task<RoomPlayer> UpdatePlayerStatusAsync(Guid roomId, Guid userId, Status status) =>
-        UpdateAsync(roomId, userId, r => r.Status = status);
 }

@@ -42,6 +42,12 @@ public class GamePlayerBuilder : IBuilder<GamePlayer>
         return this;
     }
 
+    public GamePlayerBuilder WithStatus(GamePlayer.PlayerStatus status)
+    {
+        _gamePlayer.Status = status;
+        return this;
+    }
+
     public GamePlayerBuilder WithGame(Game game)
     {
         _gamePlayer.Game = game;

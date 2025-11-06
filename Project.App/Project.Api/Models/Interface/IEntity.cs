@@ -1,4 +1,4 @@
-namespace Project.Api.Models.Interfaces;
+namespace Project.Api.Models.Interface;
 
 public interface IEntity<TKey>
     where TKey : IEquatable<TKey>

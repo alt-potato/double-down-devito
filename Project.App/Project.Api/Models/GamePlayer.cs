@@ -19,12 +19,21 @@ public class GamePlayer : ICompositeEntity<Guid, Guid>
     [Required]
     public long Balance { get; set; }
 
-    [Required]
     public long BalanceDelta { get; set; } = 0;
+
+    public PlayerStatus Status { get; set; } = PlayerStatus.Active;
 
     public virtual ICollection<Hand> Hands { get; set; } = [];
 
     public byte[] RowVersion { get; set; } = []; // concurrency
+
+    public enum PlayerStatus
+    {
+        Active, // currently playing the game
+        Inactive, // did not move last turn, will be kicked next turn
+        Away, // in the room, but not playing
+        Left, // left the room
+    }
 }
 
 public class GamePlayerConfiguration : IEntityTypeConfiguration<GamePlayer>
