@@ -67,12 +67,12 @@ public class TestDeckApiService : IDeckApiService
         return Task.FromResult(true);
     }
 
-    public Task<List<CardDTO>> DrawCards(string deckId, long handId, int count = 1)
+    public Task<IReadOnlyList<CardDTO>> DrawCards(string deckId, long handId, int count = 1)
     {
         return DrawCards(deckId, handId.ToString(), count);
     }
 
-    public Task<List<CardDTO>> DrawCards(string deckId, string handName, int count = 1)
+    public Task<IReadOnlyList<CardDTO>> DrawCards(string deckId, string handName, int count = 1)
     {
         // enforce non-negative count
         if (count < 0)
@@ -113,10 +113,10 @@ public class TestDeckApiService : IDeckApiService
             hand.Add(card);
         }
 
-        return Task.FromResult(drawnCards);
+        return Task.FromResult<IReadOnlyList<CardDTO>>(drawnCards);
     }
 
-    public Task<List<CardDTO>> ListHand(string deckId, string handName)
+    public Task<IReadOnlyList<CardDTO>> ListHand(string deckId, string handName)
     {
         // expect deck to exist
         if (!_decks.TryGetValue(deckId, out var deckData))
@@ -129,10 +129,10 @@ public class TestDeckApiService : IDeckApiService
         // return empty list if hand doesn't exist
         if (!hands.TryGetValue(handName, out var hand))
         {
-            return Task.FromResult(new List<CardDTO>());
+            return Task.FromResult<IReadOnlyList<CardDTO>>([]);
         }
 
-        return Task.FromResult(hand);
+        return Task.FromResult<IReadOnlyList<CardDTO>>(hand.AsReadOnly());
     }
 
     public Task<bool> RemoveFromHand(string deckId, string handName, string cardCodes)

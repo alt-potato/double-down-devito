@@ -77,7 +77,7 @@ public class DeckApiService(
     /// Draws one card by default.
     /// </summary>
     /// <returns>the cards drawn</returns>
-    public async Task<List<CardDTO>> DrawCards(string deckId, long handId, int count = 1)
+    public async Task<IReadOnlyList<CardDTO>> DrawCards(string deckId, long handId, int count = 1)
     {
         return await DrawCards(deckId, handId.ToString(), count);
     }
@@ -87,7 +87,11 @@ public class DeckApiService(
     /// Draws one card by default.
     /// </summary>
     /// <returns>the list of cards drawn</returns>
-    public async Task<List<CardDTO>> DrawCards(string deckId, string handName, int count = 1)
+    public async Task<IReadOnlyList<CardDTO>> DrawCards(
+        string deckId,
+        string handName,
+        int count = 1
+    )
     {
         // enforce non-negative count
         if (count < 0)
@@ -172,7 +176,7 @@ public class DeckApiService(
     /// Calls Api to list cards in specified pile from specified deck.
     /// </summary>
     /// <returns>A list of card DTOs</returns>
-    public async Task<List<CardDTO>> ListHand(string deckId, string handName)
+    public async Task<IReadOnlyList<CardDTO>> ListHand(string deckId, string handName)
     {
         string listPileUrl = $"{_baseApiUrl}/deck/{deckId}/pile/{handName}/list/";
         var listResponse = await _httpClient.GetAsync(listPileUrl);

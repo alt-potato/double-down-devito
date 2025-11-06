@@ -31,14 +31,14 @@ public interface IDeckApiService
     Draws one card by default.
     Returns true if successful.
     */
-    Task<List<CardDTO>> DrawCards(string deckId, long handId, int count);
+    Task<IReadOnlyList<CardDTO>> DrawCards(string deckId, long handId, int count);
 
     /*
     Player draws specified number of cards, count, from specified deck.
     Draws one card by default.
     Returns true if successful.
     */
-    Task<List<CardDTO>> DrawCards(string deckId, string handName, int count);
+    Task<IReadOnlyList<CardDTO>> DrawCards(string deckId, string handName, int count);
 
     /*
     Return all cards from all piles back to the main deck and shuffles deck.
@@ -60,5 +60,5 @@ public interface IDeckApiService
     /// <summary>
     /// Lists all cards in specified hand (pile) from specified deck.
     /// </summary>
-    Task<List<CardDTO>> ListHand(string deckId, string handName);
+    Task<IReadOnlyList<CardDTO>> ListHand(string deckId, string handName);
 }
