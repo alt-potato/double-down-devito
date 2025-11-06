@@ -20,6 +20,11 @@ public interface IUserRepository
     Task<User?> GetByEmailAsync(string email);
 
     /// <summary>
+    /// Check if a user exists by their ID.
+    /// </summary>
+    Task<bool> ExistsAsync(Guid id);
+
+    /// <summary>
     /// Create a new user.
     /// </summary>
     Task<User> CreateAsync(User user);

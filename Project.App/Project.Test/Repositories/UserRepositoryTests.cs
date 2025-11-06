@@ -4,29 +4,24 @@ using Project.Api.Models;
 using Project.Api.Repositories;
 using Project.Api.Utilities;
 using Project.Test.Helpers;
+using Project.Test.Helpers.Builders;
 
 namespace Project.Test.Repositories;
 
-public class UserRepositoryTests
+public class UserRepositoryTests : RepositoryTestBase<UserRepository, User>
 {
     [Fact]
-    public async Task GetAllUsersAsync_ReturnsAllUsers()
+    public async Task GetAllAsync_ReturnsAllUsers()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user1 = RepositoryTestHelper.CreateTestUser(name: "Alice", email: "alice@example.com");
-        var user2 = RepositoryTestHelper.CreateTestUser(name: "Bob", email: "bob@example.com");
-        var user3 = RepositoryTestHelper.CreateTestUser(
-            name: "Charlie",
-            email: "charlie@example.com"
+        await SeedData(
+            new UserBuilder().WithName("Alice").WithEmail("alice@example.com").Build(),
+            new UserBuilder().WithName("Bob").WithEmail("bob@example.com").Build(),
+            new UserBuilder().WithName("Charlie").WithEmail("charlie@example.com").Build()
         );
 
-        await context.Users.AddRangeAsync(user1, user2, user3);
-        await context.SaveChangesAsync();
-
         // Act
-        var result = await repository.GetAllUsersAsync();
+        var result = await _rut.GetAllAsync();
 
         // Assert
         result.Should().HaveCount(3);
@@ -36,73 +31,51 @@ public class UserRepositoryTests
     }
 
     [Fact]
-    public async Task GetAllUsersAsync_ReturnsEmptyList_WhenNoUsersExist()
+    public async Task GetAllAsync_ReturnsEmptyList_WhenNoUsersExist()
     {
-        // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-
         // Act
-        var result = await repository.GetAllUsersAsync();
+        var result = await _rut.GetAllAsync();
 
         // Assert
         result.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task GetUserByIdAsync_ReturnsUser_WhenUserExists()
+    public async Task GetByIdAsync_ReturnsUser_WhenUserExists()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var userId = Guid.NewGuid();
-        var user = RepositoryTestHelper.CreateTestUser(
-            id: userId,
-            name: "Alice",
-            email: "alice@example.com"
+        var user = await SeedData(
+            new UserBuilder().WithName("Alice").WithEmail("alice@example.com").Build()
         );
 
-        await context.Users.AddAsync(user);
-        await context.SaveChangesAsync();
-
         // Act
-        var result = await repository.GetUserByIdAsync(userId);
+        var result = await _rut.GetByIdAsync(user.Id);
 
         // Assert
         result.Should().NotBeNull();
-        result!.Id.Should().Be(userId);
+        result!.Id.Should().Be(user.Id);
         result.Name.Should().Be("Alice");
         result.Email.Should().Be("alice@example.com");
     }
 
     [Fact]
-    public async Task GetUserByIdAsync_ReturnsNull_WhenUserDoesNotExist()
+    public async Task GetByIdAsync_ReturnsNull_WhenUserDoesNotExist()
     {
-        // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var nonExistentId = Guid.NewGuid();
-
         // Act
-        var result = await repository.GetUserByIdAsync(nonExistentId);
+        var result = await _rut.GetByIdAsync(Guid.NewGuid());
 
         // Assert
         result.Should().BeNull();
     }
 
     [Fact]
-    public async Task GetUserByEmailAsync_ReturnsUser_WhenUserExists()
+    public async Task GetByEmailAsync_ReturnsUser_WhenUserExists()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser(name: "Alice", email: "alice@example.com");
-
-        await context.Users.AddAsync(user);
-        await context.SaveChangesAsync();
+        await SeedData(new UserBuilder().WithName("Alice").WithEmail("alice@example.com").Build());
 
         // Act
-        var result = await repository.GetUserByEmailAsync("alice@example.com");
+        var result = await _rut.GetByEmailAsync("alice@example.com");
 
         // Assert
         result.Should().NotBeNull();
@@ -111,31 +84,23 @@ public class UserRepositoryTests
     }
 
     [Fact]
-    public async Task GetUserByEmailAsync_ReturnsNull_WhenUserDoesNotExist()
+    public async Task GetByEmailAsync_ReturnsNull_WhenUserDoesNotExist()
     {
-        // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-
         // Act
-        var result = await repository.GetUserByEmailAsync("nonexistent@example.com");
+        var result = await _rut.GetByEmailAsync("nonexistent@example.com");
 
         // Assert
         result.Should().BeNull();
     }
 
     [Fact]
-    public async Task GetUserByEmailAsync_IsCaseInsensitive()
+    public async Task GetByEmailAsync_IsCaseInsensitive()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser(email: "alice@example.com");
-        await context.Users.AddAsync(user);
-        await context.SaveChangesAsync();
+        await SeedData(new UserBuilder().WithEmail("alice@example.com").Build());
 
         // Act: different casing than stored value
-        var result = await repository.GetUserByEmailAsync("ALICE@example.com");
+        var result = await _rut.GetByEmailAsync("ALICE@example.com");
 
         // Assert: should still find the user
         result.Should().NotBeNull();
@@ -143,18 +108,16 @@ public class UserRepositoryTests
     }
 
     [Fact]
-    public async Task CreateUserAsync_AddsUserToDatabase()
+    public async Task CreateAsync_AddsUserToDatabase()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser(name: "Alice", email: "alice@example.com");
+        var user = new UserBuilder().WithName("Alice").WithEmail("alice@example.com").Build();
 
         // Act
-        await repository.CreateUserAsync(user);
+        await _rut.CreateAsync(user);
 
         // Assert
-        var savedUser = await context.Users.FirstOrDefaultAsync(u =>
+        var savedUser = await _context.Users.FirstOrDefaultAsync(u =>
             u.Email == "alice@example.com"
         );
         savedUser.Should().NotBeNull();
@@ -163,80 +126,71 @@ public class UserRepositoryTests
     }
 
     [Fact]
-    public async Task CreateUserAsync_SavesWithDefaultBalance()
+    public async Task CreateAsync_SavesWithDefaultBalance()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser();
+        var user = new UserBuilder().Build();
 
         // Act
-        await repository.CreateUserAsync(user);
+        await _rut.CreateAsync(user);
 
         // Assert
-        var savedUser = await context.Users.FirstOrDefaultAsync(u => u.Email == user.Email);
+        var savedUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == user.Email);
         savedUser.Should().NotBeNull();
         savedUser!.Balance.Should().Be(1000);
     }
 
     [Fact]
-    public async Task CreateUserAsync_SavesWithCustomBalance()
+    public async Task CreateAsync_SavesWithCustomBalance()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser(balance: 5000);
+        var user = new UserBuilder().WithBalance(5000).Build();
 
         // Act
-        await repository.CreateUserAsync(user);
+        await _rut.CreateAsync(user);
 
         // Assert
-        var savedUser = await context.Users.FirstOrDefaultAsync(u => u.Email == user.Email);
+        var savedUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == user.Email);
         savedUser.Should().NotBeNull();
         savedUser!.Balance.Should().Be(5000);
     }
 
     [Fact]
-    public async Task CreateUserAsync_GeneratesId_WhenNotProvided()
+    public async Task CreateAsync_GeneratesId_WhenNotProvided()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser(id: Guid.Empty);
+        var user = new UserBuilder().WithId(Guid.Empty).Build();
 
         // Act
-        await repository.CreateUserAsync(user);
+        await _rut.CreateAsync(user);
 
         // Assert
-        context.Users.Should().HaveCount(1);
-        var savedUser = await context.Users.FirstAsync();
+        _context.Users.Should().HaveCount(1);
+        var savedUser = await _context.Users.FirstAsync();
         savedUser.Id.Should().NotBeEmpty();
     }
 
     [Fact]
-    public async Task UpdateUserAsync_UpdatesExistingUser()
+    public async Task UpdateAsync_UpdatesExistingUser()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser(
-            name: "Alice",
-            email: "alice@example.com",
-            balance: 1000
+        var user = await SeedData(
+            new UserBuilder()
+                .WithName("Alice")
+                .WithEmail("alice@example.com")
+                .WithBalance(1000)
+                .Build()
         );
-
-        await context.Users.AddAsync(user);
-        await context.SaveChangesAsync();
 
         // Modify user properties
         user.Name = "Alice Updated";
         user.Balance = 2000;
 
         // Act
-        await repository.UpdateUserAsync(user);
+        await _rut.UpdateAsync(user);
 
         // Assert
-        var updatedUser = await context.Users.FirstOrDefaultAsync(u =>
+        var updatedUser = await _context.Users.FirstOrDefaultAsync(u =>
             u.Email == "alice@example.com"
         );
         updatedUser.Should().NotBeNull();
@@ -245,89 +199,67 @@ public class UserRepositoryTests
     }
 
     [Fact]
-    public async Task UpdateUserAsync_DoesNotChangeEmail()
+    public async Task UpdateAsync_DoesNotChangeEmail()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser(email: "alice@example.com");
-
-        await context.Users.AddAsync(user);
-        await context.SaveChangesAsync();
-
-        var originalEmail = user.Email;
-        user.Email = "newemail@example.com";
+        var user = await SeedData(new UserBuilder().WithEmail("alice@example.com").Build());
 
         // Act
-        await repository.UpdateUserAsync(user);
+        user.Email = "newemail@example.com";
+        await _rut.UpdateAsync(user);
 
         // Assert
-        var updatedUser = await context.Users.FindAsync(user.Id);
+        var updatedUser = await _context.Users.FindAsync(user.Id);
         updatedUser.Should().NotBeNull();
         updatedUser!.Email.Should().Be("newemail@example.com");
     }
 
     [Fact]
-    public async Task DeleteUserAsync_RemovesUser_WhenUserExists()
+    public async Task DeleteAsync_RemovesUser_WhenUserExists()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser();
-
-        await context.Users.AddAsync(user);
-        await context.SaveChangesAsync();
+        var user = await SeedData(new UserBuilder().Build());
 
         // Act
-        await repository.DeleteUserAsync(user.Id);
+        await _rut.DeleteAsync(user.Id);
 
         // Assert
-        var deletedUser = await context.Users.FindAsync(user.Id);
+        var deletedUser = await _context.Users.FindAsync(user.Id);
         deletedUser.Should().BeNull();
-        context.Users.Should().BeEmpty();
+        _context.Users.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task DeleteUserAsync_ThrowsNotFoundException_WhenUserDoesNotExist()
+    public async Task DeleteAsync_ThrowsNotFoundException_WhenUserDoesNotExist()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
         var nonExistentId = Guid.NewGuid();
 
         // Act & Assert
-        await repository
-            .Invoking(r => r.DeleteUserAsync(nonExistentId))
+        await _rut.Invoking(r => r.DeleteAsync(nonExistentId))
             .Should()
             .ThrowAsync<NotFoundException>()
-            .WithMessage($"User with ID {nonExistentId} not found");
+            .WithMessage($"User with ID {nonExistentId} not found.");
     }
 
     [Fact]
-    public async Task CreateUserAsync_PersistsChanges()
+    public async Task CreateAsync_PersistsChanges()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser();
+        var user = new UserBuilder().Build();
 
         // Act
-        await repository.CreateUserAsync(user);
+        await _rut.CreateAsync(user);
 
         // Assert
-        context.Users.Should().HaveCount(1);
+        _context.Users.Should().HaveCount(1);
     }
 
     [Fact]
     public void User_HasDefaultBalanceOf1000()
     {
         // Arrange & Act
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test User",
-            Email = "test@example.com",
-        };
+        var user = new UserBuilder().Build();
 
         // Assert
         user.Balance.Should().Be(1000);
@@ -337,12 +269,7 @@ public class UserRepositoryTests
     public void User_InitializesRoomPlayersAsEmptyList()
     {
         // Arrange & Act
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test User",
-            Email = "test@example.com",
-        };
+        var user = new UserBuilder().Build();
 
         // Assert
         user.RoomPlayers.Should().NotBeNull();
@@ -350,45 +277,38 @@ public class UserRepositoryTests
     }
 
     [Fact]
-    public async Task CreateUserAsync_AllowsDuplicateEmail_InMemoryDatabase()
+    public async Task CreateAsync_AllowsDuplicateEmail_InMemoryDatabase()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user1 = RepositoryTestHelper.CreateTestUser(email: "duplicate@example.com");
-        var user2 = RepositoryTestHelper.CreateTestUser(email: "duplicate@example.com");
+        var user1 = new UserBuilder().WithEmail("duplicate@example.com").Build();
+        var user2 = new UserBuilder().WithEmail("duplicate@example.com").Build();
 
         // Act
-        await repository.CreateUserAsync(user1);
-        await repository.CreateUserAsync(user2);
+        await _rut.CreateAsync(user1);
+        await _rut.CreateAsync(user2);
 
         // Assert
         // Note: In-memory database does not enforce unique constraints
         // In a real database with proper constraints, this would throw an exception
-        var users = await repository.GetAllUsersAsync();
+        var users = await _rut.GetAllAsync();
         users.Should().HaveCount(2);
         users.Should().OnlyContain(u => u.Email == "duplicate@example.com");
     }
 
     [Fact]
-    public async Task UpdateUserAsync_UpdatesBalance_AfterTransaction()
+    public async Task UpdateAsync_UpdatesBalance_AfterTransaction()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser(balance: 1000);
-
-        await context.Users.AddAsync(user);
-        await context.SaveChangesAsync();
+        var user = await SeedData(new UserBuilder().WithBalance(1000).Build());
 
         // Simulate a transaction
         user.Balance -= 100; // User loses 100
 
         // Act
-        await repository.UpdateUserAsync(user);
+        await _rut.UpdateAsync(user);
 
         // Assert
-        var updatedUser = await context.Users.FindAsync(user.Id);
+        var updatedUser = await _context.Users.FindAsync(user.Id);
         updatedUser.Should().NotBeNull();
         updatedUser!.Balance.Should().Be(900);
     }
@@ -397,15 +317,13 @@ public class UserRepositoryTests
     public async Task User_CanHaveZeroBalance()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser(balance: 0);
+        var user = new UserBuilder().WithBalance(0).Build();
 
         // Act
-        await repository.CreateUserAsync(user);
+        await _rut.CreateAsync(user);
 
         // Assert
-        var savedUser = await context.Users.FirstOrDefaultAsync(u => u.Email == user.Email);
+        var savedUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == user.Email);
         savedUser.Should().NotBeNull();
         savedUser!.Balance.Should().Be(0);
     }
@@ -414,15 +332,13 @@ public class UserRepositoryTests
     public async Task User_CanHaveNegativeBalance()
     {
         // Arrange
-        await using var context = RepositoryTestHelper.CreateInMemoryContext();
-        var repository = new UserRepository(context);
-        var user = RepositoryTestHelper.CreateTestUser(balance: -500);
+        var user = new UserBuilder().WithBalance(-500).Build();
 
         // Act
-        await repository.CreateUserAsync(user);
+        await _rut.CreateAsync(user);
 
         // Assert
-        var savedUser = await context.Users.FirstOrDefaultAsync(u => u.Email == user.Email);
+        var savedUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == user.Email);
         savedUser.Should().NotBeNull();
         savedUser!.Balance.Should().Be(-500);
     }

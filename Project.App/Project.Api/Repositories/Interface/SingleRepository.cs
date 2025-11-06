@@ -23,24 +23,28 @@ public abstract class SingleRepository<TEntity, TKey>(
     ///
     /// If tracking is true, the entity will be tracked by the context.
     /// </summary>
-    protected async Task<TEntity?> GetAsync(TKey id, bool tracking = true) =>
+    protected virtual async Task<TEntity?> GetAsync(TKey id, bool tracking = true) =>
         await GetAsync(e => e.Id.Equals(id), tracking);
 
     /// <summary>
     /// Check if an entity exists by its primary key. Lighter than GetAsync.
     /// </summary>
-    protected async Task<bool> ExistsAsync(TKey id) => await ExistsAsync(e => e.Id.Equals(id));
+    protected virtual async Task<bool> ExistsAsync(TKey id) =>
+        await ExistsAsync(e => e.Id.Equals(id));
 
     /// <summary>
     /// Create a new entity and save it to the database.
     /// </summary>
-    protected async Task<TEntity> CreateAsync(TEntity entity) =>
-        await CreateAsync(entity, entity.Id.ToString());
+    protected virtual async Task<TEntity> CreateAsync(TEntity entity) =>
+        await CreateAsync(
+            entity ?? throw new BadRequestException($"{typeof(TEntity).Name} cannot be null."),
+            entity.Id.ToString()
+        );
 
     /// <summary>
     /// Update an existing entity and save it to the database.
     /// </summary>
-    protected async Task<TEntity> UpdateAsync(TEntity entity)
+    protected virtual async Task<TEntity> UpdateAsync(TEntity entity)
     {
         if (entity == null)
         {
@@ -67,7 +71,7 @@ public abstract class SingleRepository<TEntity, TKey>(
     /// <summary>
     /// Update an existing entity using the provided action and save it to the database.
     /// </summary>
-    protected async Task<TEntity> UpdateAsync(TKey id, Action<TEntity> updateAction)
+    protected virtual async Task<TEntity> UpdateAsync(TKey id, Action<TEntity> updateAction)
     {
         _logger?.LogDebug("Updating {type} with ID {id}", typeof(TEntity).Name, id);
 
@@ -87,7 +91,7 @@ public abstract class SingleRepository<TEntity, TKey>(
     /// <summary>
     /// Update multiple existing entities and save them to the database.
     /// </summary>
-    protected async Task<IReadOnlyList<TEntity>> UpdateRangeAsync(params TEntity[] entities)
+    protected virtual async Task<IReadOnlyList<TEntity>> UpdateRangeAsync(params TEntity[] entities)
     {
         if (entities == null || entities.Length == 0)
         {
@@ -125,7 +129,7 @@ public abstract class SingleRepository<TEntity, TKey>(
         return entityList;
     }
 
-    protected async Task<IReadOnlyList<TEntity>> UpdateRangeAsync(
+    protected virtual async Task<IReadOnlyList<TEntity>> UpdateRangeAsync(
         Action<TEntity> updateAction,
         params TKey[] ids
     )
@@ -163,7 +167,7 @@ public abstract class SingleRepository<TEntity, TKey>(
     /// <summary>
     /// Delete an entity from the database.
     /// </summary>
-    protected async Task<TEntity> DeleteAsync(TEntity entity)
+    protected virtual async Task<TEntity> DeleteAsync(TEntity entity)
     {
         if (entity == null)
         {
@@ -188,7 +192,7 @@ public abstract class SingleRepository<TEntity, TKey>(
     /// <summary>
     /// Delete an entity from the database by its primary key.
     /// </summary>
-    protected async Task<TEntity> DeleteAsync(TKey id)
+    protected virtual async Task<TEntity> DeleteAsync(TKey id)
     {
         TEntity entity = await GetTrackedEntityOrThrowAsync(id);
 
@@ -200,7 +204,7 @@ public abstract class SingleRepository<TEntity, TKey>(
     /// <summary>
     /// Delete multiple entities from the database.
     /// </summary>
-    protected async Task<IReadOnlyList<TEntity>> DeleteRangeAsync(params TEntity[] entities)
+    protected virtual async Task<IReadOnlyList<TEntity>> DeleteRangeAsync(params TEntity[] entities)
     {
         if (entities == null || entities.Length == 0)
         {
@@ -233,7 +237,7 @@ public abstract class SingleRepository<TEntity, TKey>(
     ///
     /// Used as an early check to avoid unnecessary database queries.
     /// </summary>
-    protected async Task<TEntity> GetTrackedEntityOrThrowAsync(TKey id)
+    protected virtual async Task<TEntity> GetTrackedEntityOrThrowAsync(TKey id)
     {
         // first check if entity is already tracked by the context
         EntityEntry<TEntity>? trackedEntry = _context
@@ -293,7 +297,9 @@ public abstract class SingleRepository<TEntity, TKey>(
     ///
     /// Used as an early check to avoid unnecessary database queries in batch operations.
     /// </summary>
-    protected async Task<IReadOnlyList<TEntity>> GetTrackedEntitiesOrThrowAsync(params TKey[] ids)
+    protected virtual async Task<IReadOnlyList<TEntity>> GetTrackedEntitiesOrThrowAsync(
+        params TKey[] ids
+    )
     {
         if (ids == null || ids.Length == 0)
         {

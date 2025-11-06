@@ -1,48 +1,34 @@
 using Microsoft.EntityFrameworkCore;
-using Project.Api.Data;
 using Project.Api.Models;
 using Project.Api.Repositories;
 using Project.Api.Utilities;
+using Project.Test.Helpers;
+using Project.Test.Helpers.Builders;
 
 namespace Project.Test.Repositories;
 
-public class RoomRepositoryTests
+public class RoomRepositoryTests : RepositoryTestBase<RoomRepository, Room>
 {
-    private readonly AppDbContext _context;
-    private readonly RoomRepository _repository;
-
-    public RoomRepositoryTests()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
-
-        _context = new AppDbContext(options);
-        _repository = new RoomRepository(_context);
-    }
-
     [Fact]
-    public async Task GetRoomByIdAsync_ReturnsRoom_WhenRoomExists()
+    public async Task GetByIdAsync_ReturnsRoom_WhenRoomExists()
     {
         // Arrange
-        var user = new User { Email = "host@test.com", Name = "Host User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var room = new Room
-        {
-            Description = "Test Description",
-            MaxPlayers = 4,
-            MinPlayers = 2,
-            IsPublic = true,
-            IsActive = true,
-            HostId = user.Id,
-        };
-        await _context.Rooms.AddAsync(room);
-        await _context.SaveChangesAsync();
+        var user = await SeedData(
+            new UserBuilder().WithEmail("host@test.com").WithName("Host User").Build()
+        );
+        var room = await SeedData(
+            new RoomBuilder()
+                .WithDescription("Test Description")
+                .WithMaxPlayers(4)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(true)
+                .WithHostId(user.Id)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetRoomByIdAsync(room.Id);
+        var result = await _rut.GetByIdAsync(room.Id);
 
         // Assert
         Assert.NotNull(result);
@@ -52,116 +38,96 @@ public class RoomRepositoryTests
     }
 
     [Fact]
-    public async Task GetRoomByIdAsync_ReturnsNull_WhenRoomDoesNotExist()
+    public async Task GetByIdAsync_ReturnsNull_WhenRoomDoesNotExist()
     {
         // Act
-        var result = await _repository.GetRoomByIdAsync(Guid.NewGuid());
+        var result = await _rut.GetByIdAsync(Guid.NewGuid());
 
         // Assert
         Assert.Null(result);
     }
 
     [Fact]
-    public async Task GetAllRoomsAsync_ReturnsAllRooms()
+    public async Task GetAllAsync_ReturnsAllRooms()
     {
         // Arrange
-        var user = new User { Email = "host@test.com", Name = "Host User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var rooms = new[]
-        {
-            new Room
-            {
-                Description = "Desc 1",
-                MaxPlayers = 4,
-                MinPlayers = 2,
-                IsPublic = true,
-                IsActive = true,
-                HostId = user.Id,
-            },
-            new Room
-            {
-                Description = "Desc 2",
-                MaxPlayers = 6,
-                MinPlayers = 2,
-                IsPublic = false,
-                IsActive = true,
-                HostId = user.Id,
-            },
-            new Room
-            {
-                Description = "Desc 3",
-                MaxPlayers = 8,
-                MinPlayers = 2,
-                IsPublic = true,
-                IsActive = false,
-                HostId = user.Id,
-            },
-        };
-        await _context.Rooms.AddRangeAsync(rooms);
-        await _context.SaveChangesAsync();
+        var user = await SeedData(
+            new UserBuilder().WithEmail("host@test.com").WithName("Host User").Build()
+        );
+        await SeedData<Room>(
+            new RoomBuilder()
+                .WithDescription("Desc 1")
+                .WithMaxPlayers(4)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(true)
+                .WithHostId(user.Id),
+            new RoomBuilder()
+                .WithDescription("Desc 2")
+                .WithMaxPlayers(6)
+                .WithMinPlayers(2)
+                .IsPublic(false)
+                .IsActive(true)
+                .WithHostId(user.Id),
+            new RoomBuilder()
+                .WithDescription("Desc 3")
+                .WithMaxPlayers(8)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(false)
+                .WithHostId(user.Id)
+        );
 
         // Act
-        var result = await _repository.GetAllRoomsAsync();
+        var result = await _rut.GetAllAsync();
 
         // Assert
         Assert.Equal(3, result.Count);
     }
 
     [Fact]
-    public async Task GetAllRoomsAsync_ReturnsEmptyList_WhenNoRoomsExist()
+    public async Task GetAllAsync_ReturnsEmptyList_WhenNoRoomsExist()
     {
         // Act
-        var result = await _repository.GetAllRoomsAsync();
+        var result = await _rut.GetAllAsync();
 
         // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task GetActiveRoomsAsync_ReturnsOnlyActiveRooms()
+    public async Task GetAllActiveAsync_ReturnsOnlyActiveRooms()
     {
         // Arrange
-        var user = new User { Email = "host@test.com", Name = "Host User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var rooms = new[]
-        {
-            new Room
-            {
-                Description = "Active 1",
-                MaxPlayers = 4,
-                MinPlayers = 2,
-                IsPublic = true,
-                IsActive = true,
-                HostId = user.Id,
-            },
-            new Room
-            {
-                Description = "Active 2",
-                MaxPlayers = 6,
-                MinPlayers = 2,
-                IsPublic = false,
-                IsActive = true,
-                HostId = user.Id,
-            },
-            new Room
-            {
-                Description = "Inactive",
-                MaxPlayers = 8,
-                MinPlayers = 2,
-                IsPublic = true,
-                IsActive = false,
-                HostId = user.Id,
-            },
-        };
-        await _context.Rooms.AddRangeAsync(rooms);
-        await _context.SaveChangesAsync();
+        var user = await SeedData(
+            new UserBuilder().WithEmail("host@test.com").WithName("Host User").Build()
+        );
+        await SeedData<Room>(
+            new RoomBuilder()
+                .WithDescription("Active 1")
+                .WithMaxPlayers(4)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(true)
+                .WithHostId(user.Id),
+            new RoomBuilder()
+                .WithDescription("Active 2")
+                .WithMaxPlayers(6)
+                .WithMinPlayers(2)
+                .IsPublic(false)
+                .IsActive(true)
+                .WithHostId(user.Id),
+            new RoomBuilder()
+                .WithDescription("Inactive")
+                .WithMaxPlayers(8)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(false)
+                .WithHostId(user.Id)
+        );
 
         // Act
-        var result = await _repository.GetActiveRoomsAsync();
+        var result = await _rut.GetAllActiveAsync();
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -169,84 +135,70 @@ public class RoomRepositoryTests
     }
 
     [Fact]
-    public async Task GetActiveRoomsAsync_ReturnsEmptyList_WhenNoActiveRooms()
+    public async Task GetAllActiveAsync_ReturnsEmptyList_WhenNoActiveRooms()
     {
         // Arrange
-        var user = new User { Email = "host@test.com", Name = "Host User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var room = new Room
-        {
-            Description = "Inactive",
-            MaxPlayers = 4,
-            MinPlayers = 2,
-            IsPublic = true,
-            IsActive = false,
-            HostId = user.Id,
-        };
-        await _context.Rooms.AddAsync(room);
-        await _context.SaveChangesAsync();
+        var user = await SeedData(
+            new UserBuilder().WithEmail("host@test.com").WithName("Host User").Build()
+        );
+        await SeedData(
+            new RoomBuilder()
+                .WithDescription("Inactive")
+                .WithMaxPlayers(4)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(false)
+                .WithHostId(user.Id)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetActiveRoomsAsync();
+        var result = await _rut.GetAllActiveAsync();
 
         // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task GetPublicRoomsAsync_ReturnsOnlyPublicAndActiveRooms()
+    public async Task GetAllPublicAsync_ReturnsOnlyPublicAndActiveRooms()
     {
         // Arrange
-        var user = new User { Email = "host@test.com", Name = "Host User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var rooms = new[]
-        {
-            new Room
-            {
-                Description = "Public Active",
-                MaxPlayers = 4,
-                MinPlayers = 2,
-                IsPublic = true,
-                IsActive = true,
-                HostId = user.Id,
-            },
-            new Room
-            {
-                Description = "Public Inactive",
-                MaxPlayers = 6,
-                MinPlayers = 2,
-                IsPublic = true,
-                IsActive = false,
-                HostId = user.Id,
-            },
-            new Room
-            {
-                Description = "Private Active",
-                MaxPlayers = 8,
-                MinPlayers = 2,
-                IsPublic = false,
-                IsActive = true,
-                HostId = user.Id,
-            },
-            new Room
-            {
-                Description = "Private Inactive",
-                MaxPlayers = 10,
-                MinPlayers = 2,
-                IsPublic = false,
-                IsActive = false,
-                HostId = user.Id,
-            },
-        };
-        await _context.Rooms.AddRangeAsync(rooms);
-        await _context.SaveChangesAsync();
+        var user = await SeedData(
+            new UserBuilder().WithEmail("host@test.com").WithName("Host User").Build()
+        );
+        await SeedData<Room>(
+            new RoomBuilder()
+                .WithDescription("Public Active")
+                .WithMaxPlayers(4)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(true)
+                .WithHostId(user.Id),
+            new RoomBuilder()
+                .WithDescription("Public Inactive")
+                .WithMaxPlayers(6)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(false)
+                .WithHostId(user.Id),
+            new RoomBuilder()
+                .WithDescription("Private Active")
+                .WithMaxPlayers(8)
+                .WithMinPlayers(2)
+                .IsPublic(false)
+                .IsActive(true)
+                .WithHostId(user.Id),
+            new RoomBuilder()
+                .WithDescription("Private Inactive")
+                .WithMaxPlayers(10)
+                .WithMinPlayers(2)
+                .IsPublic(false)
+                .IsActive(false)
+                .WithHostId(user.Id)
+        );
 
         // Act
-        var result = await _repository.GetPublicRoomsAsync();
+        var result = await _rut.GetAllPublicAsync();
 
         // Assert
         Assert.Single(result);
@@ -256,54 +208,50 @@ public class RoomRepositoryTests
     }
 
     [Fact]
-    public async Task GetPublicRoomsAsync_ReturnsEmptyList_WhenNoPublicActiveRooms()
+    public async Task GetAllPublicAsync_ReturnsEmptyList_WhenNoPublicActiveRooms()
     {
         // Arrange
-        var user = new User { Email = "host@test.com", Name = "Host User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var room = new Room
-        {
-            Description = "Private Active",
-            MaxPlayers = 4,
-            MinPlayers = 2,
-            IsPublic = false,
-            IsActive = true,
-            HostId = user.Id,
-        };
-        await _context.Rooms.AddAsync(room);
-        await _context.SaveChangesAsync();
+        var user = await SeedData(
+            new UserBuilder().WithEmail("host@test.com").WithName("Host User").Build()
+        );
+        await SeedData(
+            new RoomBuilder()
+                .WithDescription("Private Active")
+                .WithMaxPlayers(4)
+                .WithMinPlayers(2)
+                .IsPublic(false)
+                .IsActive(true)
+                .WithHostId(user.Id)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetPublicRoomsAsync();
+        var result = await _rut.GetAllPublicAsync();
 
         // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task GetRoomByHostIdAsync_ReturnsRoom_WhenRoomExistsForHost()
+    public async Task GetByHostIdAsync_ReturnsRoom_WhenRoomExistsForHost()
     {
         // Arrange
-        var user = new User { Email = "host@test.com", Name = "Host User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var room = new Room
-        {
-            Description = "Host Room",
-            MaxPlayers = 4,
-            MinPlayers = 2,
-            IsPublic = true,
-            IsActive = true,
-            HostId = user.Id,
-        };
-        await _context.Rooms.AddAsync(room);
-        await _context.SaveChangesAsync();
+        var user = await SeedData(
+            new UserBuilder().WithEmail("host@test.com").WithName("Host User").Build()
+        );
+        await SeedData(
+            new RoomBuilder()
+                .WithDescription("Host Room")
+                .WithMaxPlayers(4)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(true)
+                .WithHostId(user.Id)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetRoomByHostIdAsync(user.Id);
+        var result = await _rut.GetByHostIdAsync(user.Id);
 
         // Assert
         Assert.NotNull(result);
@@ -312,35 +260,33 @@ public class RoomRepositoryTests
     }
 
     [Fact]
-    public async Task GetRoomByHostIdAsync_ReturnsNull_WhenNoRoomExistsForHost()
+    public async Task GetByHostIdAsync_ReturnsNull_WhenNoRoomExistsForHost()
     {
         // Act
-        var result = await _repository.GetRoomByHostIdAsync(Guid.NewGuid());
+        var result = await _rut.GetByHostIdAsync(Guid.NewGuid());
 
         // Assert
         Assert.Null(result);
     }
 
     [Fact]
-    public async Task CreateRoomAsync_CreatesRoomSuccessfully()
+    public async Task CreateAsync_CreatesRoomSuccessfully()
     {
         // Arrange
-        var user = new User { Email = "host@test.com", Name = "Host User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var room = new Room
-        {
-            Description = "New Description",
-            MaxPlayers = 4,
-            MinPlayers = 2,
-            IsPublic = true,
-            IsActive = true,
-            HostId = user.Id,
-        };
+        var user = await SeedData(
+            new UserBuilder().WithEmail("host@test.com").WithName("Host User").Build()
+        );
+        var room = new RoomBuilder()
+            .WithDescription("New Description")
+            .WithMaxPlayers(4)
+            .WithMinPlayers(2)
+            .IsPublic(true)
+            .IsActive(true)
+            .WithHostId(user.Id)
+            .Build();
 
         // Act
-        var result = await _repository.CreateRoomAsync(room);
+        var result = await _rut.CreateAsync(room);
 
         // Assert
         Assert.NotNull(result);
@@ -350,38 +296,35 @@ public class RoomRepositoryTests
     }
 
     [Fact]
-    public async Task UpdateRoomAsync_UpdatesRoomSuccessfully()
+    public async Task UpdateAsync_UpdatesRoomSuccessfully()
     {
         // Arrange
-        var user = new User { Email = "host@test.com", Name = "Host User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
+        var user = await SeedData(
+            new UserBuilder().WithEmail("host@test.com").WithName("Host User").Build()
+        );
+        var room = await SeedData(
+            new RoomBuilder()
+                .WithDescription("Original")
+                .WithMaxPlayers(4)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(true)
+                .WithHostId(user.Id)
+                .Build()
+        );
 
-        var room = new Room
-        {
-            Description = "Original",
-            MaxPlayers = 4,
-            MinPlayers = 2,
-            IsPublic = true,
-            IsActive = true,
-            HostId = user.Id,
-        };
-        await _context.Rooms.AddAsync(room);
-        await _context.SaveChangesAsync();
-
-        var updatedRoom = new Room
-        {
-            Id = room.Id,
-            Description = "Updated",
-            MaxPlayers = 6,
-            MinPlayers = 3,
-            IsPublic = false,
-            IsActive = false,
-            HostId = user.Id,
-        };
+        var updatedRoom = new RoomBuilder()
+            .WithDescription("Updated")
+            .WithMaxPlayers(6)
+            .WithMinPlayers(3)
+            .IsPublic(false)
+            .IsActive(false)
+            .WithHostId(user.Id)
+            .Build();
+        updatedRoom.Id = room.Id;
 
         // Act
-        var result = await _repository.UpdateRoomAsync(updatedRoom);
+        var result = await _rut.UpdateAsync(updatedRoom);
 
         // Assert
         Assert.NotNull(result);
@@ -393,46 +336,42 @@ public class RoomRepositoryTests
     }
 
     [Fact]
-    public async Task UpdateRoomAsync_ThrowsNotFoundException_WhenRoomDoesNotExist()
+    public async Task UpdateAsync_ThrowsNotFoundException_WhenRoomDoesNotExist()
     {
         // Arrange
-        var room = new Room
-        {
-            Id = Guid.NewGuid(),
-            Description = "Non-existent",
-            MaxPlayers = 4,
-            MinPlayers = 2,
-            IsPublic = true,
-            IsActive = true,
-            HostId = Guid.NewGuid(),
-        };
+        var room = new RoomBuilder()
+            .WithDescription("Non-existent")
+            .WithMaxPlayers(4)
+            .WithMinPlayers(2)
+            .IsPublic(true)
+            .IsActive(true)
+            .WithHostId(Guid.NewGuid())
+            .Build();
 
         // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() => _repository.UpdateRoomAsync(room));
+        await Assert.ThrowsAsync<NotFoundException>(() => _rut.UpdateAsync(room));
     }
 
     [Fact]
-    public async Task DeleteRoomAsync_DeletesRoomSuccessfully()
+    public async Task DeleteAsync_DeletesRoomSuccessfully()
     {
         // Arrange
-        var user = new User { Email = "host@test.com", Name = "Host User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var room = new Room
-        {
-            Description = "To Delete",
-            MaxPlayers = 4,
-            MinPlayers = 2,
-            IsPublic = true,
-            IsActive = true,
-            HostId = user.Id,
-        };
-        await _context.Rooms.AddAsync(room);
-        await _context.SaveChangesAsync();
+        var user = await SeedData(
+            new UserBuilder().WithEmail("host@test.com").WithName("Host User").Build()
+        );
+        var room = await SeedData(
+            new RoomBuilder()
+                .WithDescription("To Delete")
+                .WithMaxPlayers(4)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(true)
+                .WithHostId(user.Id)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.DeleteRoomAsync(room.Id);
+        var result = await _rut.DeleteAsync(room.Id);
 
         // Assert
         Assert.NotNull(result);
@@ -441,46 +380,42 @@ public class RoomRepositoryTests
     }
 
     [Fact]
-    public async Task DeleteRoomAsync_ThrowsNotFoundException_WhenRoomDoesNotExist()
+    public async Task DeleteAsync_ThrowsNotFoundException_WhenRoomDoesNotExist()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() =>
-            _repository.DeleteRoomAsync(Guid.NewGuid())
-        );
+        await Assert.ThrowsAsync<NotFoundException>(() => _rut.DeleteAsync(Guid.NewGuid()));
     }
 
     [Fact]
-    public async Task RoomExistsAsync_ReturnsTrue_WhenRoomExists()
+    public async Task ExistsAsync_ReturnsTrue_WhenRoomExists()
     {
         // Arrange
-        var user = new User { Email = "host@test.com", Name = "Host User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var room = new Room
-        {
-            Description = "Exists",
-            MaxPlayers = 4,
-            MinPlayers = 2,
-            IsPublic = true,
-            IsActive = true,
-            HostId = user.Id,
-        };
-        await _context.Rooms.AddAsync(room);
-        await _context.SaveChangesAsync();
+        var user = await SeedData(
+            new UserBuilder().WithEmail("host@test.com").WithName("Host User").Build()
+        );
+        var room = await SeedData(
+            new RoomBuilder()
+                .WithDescription("Exists")
+                .WithMaxPlayers(4)
+                .WithMinPlayers(2)
+                .IsPublic(true)
+                .IsActive(true)
+                .WithHostId(user.Id)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.RoomExistsAsync(room.Id);
+        var result = await _rut.ExistsAsync(room.Id);
 
         // Assert
         Assert.True(result);
     }
 
     [Fact]
-    public async Task RoomExistsAsync_ReturnsFalse_WhenRoomDoesNotExist()
+    public async Task ExistsAsync_ReturnsFalse_WhenRoomDoesNotExist()
     {
         // Act
-        var result = await _repository.RoomExistsAsync(Guid.NewGuid());
+        var result = await _rut.ExistsAsync(Guid.NewGuid());
 
         // Assert
         Assert.False(result);

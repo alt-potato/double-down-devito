@@ -16,13 +16,13 @@ public class HandRepository(AppDbContext context, ILogger<HandRepository> logger
     /// <summary>
     /// Get all hands in a game.
     /// </summary>
-    public async Task<IReadOnlyList<Hand>> GetByGameIdAsync(Guid gameId) =>
+    public async Task<IReadOnlyList<Hand>> GetAllByGameIdAsync(Guid gameId) =>
         await GetAllAsync(h => h.GameId == gameId);
 
     /// <summary>
     /// Get all hands in a specific game for a specific user.
     /// </summary>
-    public async Task<IReadOnlyList<Hand>> GetByGameIdAndUserIdAsync(Guid gameId, Guid userId) =>
+    public async Task<IReadOnlyList<Hand>> GetAllByGameIdAndUserIdAsync(Guid gameId, Guid userId) =>
         await GetAllAsync(h => h.GameId == gameId && h.UserId == userId);
 
     /// <summary>
@@ -36,28 +36,28 @@ public class HandRepository(AppDbContext context, ILogger<HandRepository> logger
     /// <summary>
     /// Create a new hand.
     /// </summary>
-    public new async Task<Hand> CreateAsync(Hand hand) => await CreateAsync(hand);
+    public new async Task<Hand> CreateAsync(Hand hand) => await base.CreateAsync(hand);
 
     /// <summary>
     /// Update an existing hand.
     /// </summary>
-    public new async Task<Hand> UpdateAsync(Hand hand) => await UpdateAsync(hand);
+    public new async Task<Hand> UpdateAsync(Hand hand) => await base.UpdateAsync(hand);
 
     /// <summary>
     /// Partially update an existing hand.
     /// </summary>
-    public async Task<Hand> PatchAsync(Guid handId, int? Order = null, int? Bet = null) =>
+    public async Task<Hand> PatchAsync(Guid handId, int? order = null, int? bet = null) =>
         await UpdateAsync(
             handId,
             h =>
             {
-                h.Order = Order ?? h.Order;
-                h.Bet = Bet ?? h.Bet;
+                h.Order = order ?? h.Order;
+                h.Bet = bet ?? h.Bet;
             }
         );
 
     /// <summary>
     /// Delete a hand by its ID.
     /// </summary>
-    public new async Task<Hand> DeleteAsync(Guid handId) => await DeleteAsync(handId);
+    public new async Task<Hand> DeleteAsync(Guid handId) => await base.DeleteAsync(handId);
 }

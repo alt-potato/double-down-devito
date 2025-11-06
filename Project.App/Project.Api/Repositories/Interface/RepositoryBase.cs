@@ -25,7 +25,7 @@ public abstract class RepositoryBase<TEntity>(
     ///
     /// If tracking is true, the entity will be tracked by the context.
     /// </summary>
-    protected async Task<TEntity?> GetAsync(
+    protected virtual async Task<TEntity?> GetAsync(
         Expression<Func<TEntity, bool>> predicate,
         bool tracking = true
     )
@@ -40,7 +40,7 @@ public abstract class RepositoryBase<TEntity>(
     ///
     /// If no arguments are provided, returns all entities.
     /// </summary>
-    protected async Task<IReadOnlyList<TEntity>> GetAllAsync(
+    protected virtual async Task<IReadOnlyList<TEntity>> GetAllAsync(
         Expression<Func<TEntity, bool>>? predicate = null,
         Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>? orderBy = null,
         Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>>? include = null,
@@ -87,14 +87,15 @@ public abstract class RepositoryBase<TEntity>(
     /// <summary>
     /// Check if an entity exists using a LINQ predicate, which can be translated to SQL by EF Core.
     /// </summary>
-    protected async Task<bool> ExistsAsync(Expression<Func<TEntity, bool>> predicate) =>
+    protected virtual async Task<bool> ExistsAsync(Expression<Func<TEntity, bool>> predicate) =>
         await _dbSet.AnyAsync(predicate);
 
     /// <summary>
     /// Count the number of entities that match a LINQ predicate, or all entities if the predicate is null.
     /// </summary>
-    protected async Task<int> CountAsync(Expression<Func<TEntity, bool>>? predicate = null) =>
-        predicate == null ? await _dbSet.CountAsync() : await _dbSet.CountAsync(predicate);
+    protected virtual async Task<int> CountAsync(
+        Expression<Func<TEntity, bool>>? predicate = null
+    ) => predicate == null ? await _dbSet.CountAsync() : await _dbSet.CountAsync(predicate);
 
     /// <summary>
     /// Create a new entity and save it to the database.
@@ -128,7 +129,7 @@ public abstract class RepositoryBase<TEntity>(
     /// <summary>
     /// Create multiple new entities and save them to the database.
     /// </summary>
-    protected async Task<IReadOnlyList<TEntity>> CreateRangeAsync(params TEntity[] entities)
+    protected virtual async Task<IReadOnlyList<TEntity>> CreateRangeAsync(params TEntity[] entities)
     {
         if (entities == null || entities.Length == 0)
         {
@@ -159,7 +160,7 @@ public abstract class RepositoryBase<TEntity>(
     /// Convenience method to save changes to the database with concurrency checking.
     /// </summary>
     /// <returns></returns>
-    protected async Task SaveChangesWithConcurrencyCheckAsync() =>
+    protected virtual async Task SaveChangesWithConcurrencyCheckAsync() =>
         await _context.SaveChangesWithConcurrencyCheckAsync(_logger);
 }
 

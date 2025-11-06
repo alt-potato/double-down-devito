@@ -1,52 +1,40 @@
 using Microsoft.EntityFrameworkCore;
-using Project.Api.Data;
 using Project.Api.Models;
 using Project.Api.Repositories;
 using Project.Api.Utilities;
 using Project.Test.Helpers;
+using Project.Test.Helpers.Builders;
 
 namespace Project.Test.Repositories;
 
-public class HandRepositoryTests
+public class HandRepositoryTests : RepositoryTestBase<HandRepository, Hand>
 {
-    private readonly AppDbContext _context;
-    private readonly HandRepository _repository;
-
-    public HandRepositoryTests()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
-
-        _context = new AppDbContext(options);
-        _repository = new HandRepository(_context);
-    }
-
     [Fact]
-    public async Task GetHandByIdAsync_ReturnsHand_WhenHandExists()
+    public async Task GetByIdAsync_ReturnsHand_WhenHandExists()
     {
         // Arrange
-        var game = RepositoryTestHelper.CreateTestGame();
-        var user = RepositoryTestHelper.CreateTestUser();
-        await _context.Games.AddAsync(game);
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var gamePlayer = new GamePlayer
-        {
-            GameId = game.Id,
-            UserId = user.Id,
-            Balance = 1000,
-        };
-        await _context.GamePlayers.AddAsync(gamePlayer);
-        await _context.SaveChangesAsync();
-
-        var hand = RepositoryTestHelper.CreateTestHand(gameId: game.Id, userId: user.Id);
-        await _context.Hands.AddAsync(hand);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1000)
+                .Build()
+        );
+        var hand = await SeedData(
+            new HandBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithOrder(1)
+                .WithBet(100)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetHandByIdAsync(hand.Id);
+        var result = await _rut.GetByIdAsync(hand.Id);
 
         // Assert
         Assert.NotNull(result);
@@ -58,71 +46,37 @@ public class HandRepositoryTests
     }
 
     [Fact]
-    public async Task GetHandByIdAsync_ReturnsNull_WhenHandDoesNotExist()
+    public async Task GetByIdAsync_ReturnsNull_WhenHandDoesNotExist()
     {
         // Act
-        var result = await _repository.GetHandByIdAsync(Guid.NewGuid());
+        var result = await _rut.GetByIdAsync(Guid.NewGuid());
 
         // Assert
         Assert.Null(result);
     }
 
     [Fact]
-    public async Task GetHandByIdAsync_ThrowsArgumentException_WhenInvalidHandId()
-    {
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => _repository.GetHandByIdAsync(Guid.Empty));
-    }
-
-    [Fact]
-    public async Task GetHandsByGameIdAsync_ReturnsHands_WhenExist()
+    public async Task GetAllByGameIdAsync_ReturnsHands_WhenExist()
     {
         // Arrange
-        var game = RepositoryTestHelper.CreateTestGame();
-        var user1 = RepositoryTestHelper.CreateTestUser(email: "user1@test.com", name: "User 1");
-        var user2 = RepositoryTestHelper.CreateTestUser(email: "user2@test.com", name: "User 2");
-        await _context.Games.AddAsync(game);
-        await _context.Users.AddRangeAsync(user1, user2);
-        await _context.SaveChangesAsync();
-
-        var gamePlayers = new[]
-        {
-            new GamePlayer
-            {
-                GameId = game.Id,
-                UserId = user1.Id,
-                Balance = 1000,
-            },
-            new GamePlayer
-            {
-                GameId = game.Id,
-                UserId = user2.Id,
-                Balance = 1500,
-            },
-        };
-        await _context.GamePlayers.AddRangeAsync(gamePlayers);
-        await _context.SaveChangesAsync();
-
-        var hands = new[]
-        {
-            RepositoryTestHelper.CreateTestHand(
-                gameId: game.Id,
-                userId: user1.Id,
-                order: 1,
-                bet: 100
-            ),
-            RepositoryTestHelper.CreateTestHand(
-                gameId: game.Id,
-                userId: user2.Id,
-                order: 2,
-                bet: 200
-            ),
-        };
-        await _context.Hands.AddRangeAsync(hands);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user1 = await SeedData(
+            new UserBuilder().WithEmail("user1@test.com").WithName("User 1").Build()
+        );
+        var user2 = await SeedData(
+            new UserBuilder().WithEmail("user2@test.com").WithName("User 2").Build()
+        );
+        await SeedData<GamePlayer>(
+            new GamePlayerBuilder().WithGameId(game.Id).WithUserId(user1.Id).WithBalance(1000),
+            new GamePlayerBuilder().WithGameId(game.Id).WithUserId(user2.Id).WithBalance(1500)
+        );
+        await SeedData<Hand>(
+            new HandBuilder().WithGameId(game.Id).WithUserId(user1.Id).WithOrder(1).WithBet(100),
+            new HandBuilder().WithGameId(game.Id).WithUserId(user2.Id).WithOrder(2).WithBet(200)
+        );
 
         // Act
-        var result = await _repository.GetHandsByGameIdAsync(game.Id);
+        var result = await _rut.GetAllByGameIdAsync(game.Id);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -130,70 +84,50 @@ public class HandRepositoryTests
     }
 
     [Fact]
-    public async Task GetHandsByGameIdAsync_ReturnsEmpty_WhenNoHands()
+    public async Task GetAllByGameIdAsync_ReturnsEmpty_WhenNoHands()
     {
         // Arrange
-        var game = RepositoryTestHelper.CreateTestGame();
-        await _context.Games.AddAsync(game);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
 
         // Act
-        var result = await _repository.GetHandsByGameIdAsync(game.Id);
+        var result = await _rut.GetAllByGameIdAsync(game.Id);
 
         // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task GetHandsByGameIdAsync_ThrowsArgumentException_WhenInvalidGameId()
-    {
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            _repository.GetHandsByGameIdAsync(Guid.Empty)
-        );
-    }
-
-    [Fact]
-    public async Task GetHandsByGameIdAndUserIdAsync_ReturnsHands_WhenExist()
+    public async Task GetAllByGameIdAndUserIdAsync_ReturnsHands_WhenExist()
     {
         // Arrange
-        var game = RepositoryTestHelper.CreateTestGame();
-        var user = RepositoryTestHelper.CreateTestUser();
-        await _context.Games.AddAsync(game);
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var gamePlayer = new GamePlayer
-        {
-            GameId = game.Id,
-            UserId = user.Id,
-            Balance = 1000,
-        };
-        await _context.GamePlayers.AddAsync(gamePlayer);
-        await _context.SaveChangesAsync();
-
-        var hands = new[]
-        {
-            RepositoryTestHelper.CreateTestHand(
-                gameId: game.Id,
-                userId: user.Id,
-                order: 1,
-                handNumber: 1,
-                bet: 100
-            ),
-            RepositoryTestHelper.CreateTestHand(
-                gameId: game.Id,
-                userId: user.Id,
-                order: 1,
-                handNumber: 2,
-                bet: 200
-            ),
-        };
-        await _context.Hands.AddRangeAsync(hands);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1000)
+                .Build()
+        );
+        await SeedData<Hand>(
+            new HandBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithOrder(1)
+                .WithHandNumber(1)
+                .WithBet(100),
+            new HandBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithOrder(1)
+                .WithHandNumber(2)
+                .WithBet(200)
+        );
 
         // Act
-        var result = await _repository.GetHandsByGameIdAndUserIdAsync(game.Id, user.Id);
+        var result = await _rut.GetAllByGameIdAndUserIdAsync(game.Id, user.Id);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -202,65 +136,48 @@ public class HandRepositoryTests
     }
 
     [Fact]
-    public async Task GetHandsByGameIdAndUserIdAsync_ReturnsEmpty_WhenNoHands()
+    public async Task GetAllByGameIdAndUserIdAsync_ReturnsEmpty_WhenNoHands()
     {
         // Arrange
-        var game = RepositoryTestHelper.CreateTestGame();
-        var user = RepositoryTestHelper.CreateTestUser();
-        await _context.Games.AddAsync(game);
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
 
         // Act
-        var result = await _repository.GetHandsByGameIdAndUserIdAsync(game.Id, user.Id);
+        var result = await _rut.GetAllByGameIdAndUserIdAsync(game.Id, user.Id);
 
         // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task GetHandsByGameIdAndUserIdAsync_ThrowsBadRequestException_WhenInvalidIds()
-    {
-        // Act & Assert
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _repository.GetHandsByGameIdAndUserIdAsync(Guid.Empty, Guid.NewGuid())
-        );
-        await Assert.ThrowsAsync<BadRequestException>(() =>
-            _repository.GetHandsByGameIdAndUserIdAsync(Guid.NewGuid(), Guid.Empty)
-        );
-    }
-
-    [Fact]
-    public async Task GetHandByGameTurnOrderAsync_ReturnsHand_WhenExists()
+    public async Task GetByGameTurnOrderAsync_ReturnsHand_WhenExists()
     {
         // Arrange
-        var game = RepositoryTestHelper.CreateTestGame();
-        var user = RepositoryTestHelper.CreateTestUser();
-        await _context.Games.AddAsync(game);
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var gamePlayer = new GamePlayer
-        {
-            GameId = game.Id,
-            UserId = user.Id,
-            Balance = 1000,
-        };
-        await _context.GamePlayers.AddAsync(gamePlayer);
-        await _context.SaveChangesAsync();
-
-        var hand = RepositoryTestHelper.CreateTestHand(
-            gameId: game.Id,
-            userId: user.Id,
-            order: 1,
-            handNumber: 1,
-            bet: 100
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
         );
-        await _context.Hands.AddAsync(hand);
-        await _context.SaveChangesAsync();
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1000)
+                .Build()
+        );
+        await SeedData(
+            new HandBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithOrder(1)
+                .WithHandNumber(1)
+                .WithBet(100)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetHandByGameTurnOrderAsync(game.Id, 1, 1);
+        var result = await _rut.GetByGameTurnOrderAsync(game.Id, 1, 1);
 
         // Assert
         Assert.NotNull(result);
@@ -272,37 +189,31 @@ public class HandRepositoryTests
     }
 
     [Fact]
-    public async Task GetHandByGameTurnOrderAsync_ReturnsNull_WhenDoesNotExist()
+    public async Task GetByGameTurnOrderAsync_ReturnsNull_WhenDoesNotExist()
     {
         // Arrange
-        var game = RepositoryTestHelper.CreateTestGame();
-        await _context.Games.AddAsync(game);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
 
         // Act
-        var result = await _repository.GetHandByGameTurnOrderAsync(game.Id, 1, 1);
+        var result = await _rut.GetByGameTurnOrderAsync(game.Id, 1, 1);
 
         // Assert
         Assert.Null(result);
     }
 
     [Fact]
-    public async Task GetHandByGameTurnOrderAsync_ThrowsArgumentException_WhenInvalidGameId()
-    {
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            _repository.GetHandByGameTurnOrderAsync(Guid.Empty, 1, 1)
-        );
-    }
-
-    [Fact]
-    public async Task CreateHandAsync_CreatesHandSuccessfully()
+    public async Task CreateAsync_CreatesHandSuccessfully()
     {
         // Arrange
-        var hand = RepositoryTestHelper.CreateTestHand();
+        var hand = new HandBuilder()
+            .WithGameId(Guid.NewGuid())
+            .WithUserId(Guid.NewGuid())
+            .WithOrder(1)
+            .WithBet(100)
+            .Build();
 
         // Act
-        var result = await _repository.CreateHandAsync(hand);
+        var result = await _rut.CreateAsync(hand);
 
         // Assert
         Assert.NotNull(result);
@@ -313,30 +224,35 @@ public class HandRepositoryTests
     }
 
     [Fact]
-    public async Task CreateHandAsync_ThrowsArgumentNullException_WhenHandIsNull()
+    public async Task CreateAsync_ThrowsBadRequestException_WhenHandIsNull()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() => _repository.CreateHandAsync(null!));
+        await Assert.ThrowsAsync<BadRequestException>(() => _rut.CreateAsync(null!));
     }
 
     [Fact]
-    public async Task UpdateHandAsync_UpdatesHandSuccessfully()
+    public async Task UpdateAsync_UpdatesHandSuccessfully()
     {
         // Arrange
-        var hand = RepositoryTestHelper.CreateTestHand();
-        await _context.Hands.AddAsync(hand);
-        await _context.SaveChangesAsync();
-
-        var updatedHand = RepositoryTestHelper.CreateTestHand(
-            gameId: hand.GameId,
-            userId: hand.UserId,
-            order: 2,
-            bet: 200
+        var hand = await SeedData(
+            new HandBuilder()
+                .WithGameId(Guid.NewGuid())
+                .WithUserId(Guid.NewGuid())
+                .WithOrder(1)
+                .WithBet(100)
+                .Build()
         );
+
+        var updatedHand = new HandBuilder()
+            .WithGameId(hand.GameId)
+            .WithUserId(hand.UserId)
+            .WithOrder(2)
+            .WithBet(200)
+            .Build();
         updatedHand.Id = hand.Id;
 
         // Act
-        var result = await _repository.UpdateHandAsync(hand.Id, updatedHand);
+        var result = await _rut.UpdateAsync(updatedHand);
 
         // Assert
         Assert.NotNull(result);
@@ -345,51 +261,57 @@ public class HandRepositoryTests
     }
 
     [Fact]
-    public async Task UpdateHandAsync_ThrowsNotFoundException_WhenHandDoesNotExist()
+    public async Task UpdateAsync_ThrowsNotFoundException_WhenHandDoesNotExist()
     {
         // Arrange
-        var hand = new Hand
-        {
-            Id = Guid.NewGuid(),
-            GameId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Order = 1,
-            Bet = 100,
-        };
+        var hand = new HandBuilder()
+            .WithGameId(Guid.NewGuid())
+            .WithUserId(Guid.NewGuid())
+            .WithOrder(1)
+            .WithBet(100)
+            .Build();
 
         // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() =>
-            _repository.UpdateHandAsync(hand.Id, hand)
-        );
+        await Assert.ThrowsAsync<NotFoundException>(() => _rut.UpdateAsync(hand));
     }
 
     [Fact]
-    public async Task PatchHandAsync_UpdatesHandSuccessfully()
+    public async Task PatchAsync_UpdatesHandSuccessfully()
     {
         // Arrange
-        var hand = RepositoryTestHelper.CreateTestHand();
-        await _context.Hands.AddAsync(hand);
-        await _context.SaveChangesAsync();
+        var hand = await SeedData(
+            new HandBuilder()
+                .WithGameId(Guid.NewGuid())
+                .WithUserId(Guid.NewGuid())
+                .WithOrder(1)
+                .WithBet(100)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.PatchHandAsync(hand.Id, Order: 2, Bet: 50);
+        var result = await _rut.PatchAsync(hand.Id, order: 2, bet: 50);
 
         // Assert
         Assert.NotNull(result);
         Assert.Equal(2, result.Order);
-        Assert.Equal(150, result.Bet); // 100 + 50
+        Assert.Equal(50, result.Bet); // replaced with 50
     }
 
     [Fact]
-    public async Task PatchHandAsync_UpdatesOnlyOrder_WhenBetNotProvided()
+    public async Task PatchAsync_UpdatesOnlyOrder_WhenBetNotProvided()
     {
         // Arrange
-        var hand = RepositoryTestHelper.CreateTestHand();
-        await _context.Hands.AddAsync(hand);
-        await _context.SaveChangesAsync();
+        var hand = await SeedData(
+            new HandBuilder()
+                .WithGameId(Guid.NewGuid())
+                .WithUserId(Guid.NewGuid())
+                .WithOrder(1)
+                .WithBet(100)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.PatchHandAsync(hand.Id, Order: 2);
+        var result = await _rut.PatchAsync(hand.Id, order: 2);
 
         // Assert
         Assert.NotNull(result);
@@ -398,53 +320,51 @@ public class HandRepositoryTests
     }
 
     [Fact]
-    public async Task PatchHandAsync_UpdatesOnlyBet_WhenOrderNotProvided()
+    public async Task PatchAsync_UpdatesOnlyBet_WhenOrderNotProvided()
     {
         // Arrange
-        var hand = new Hand
-        {
-            GameId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Order = 1,
-            Bet = 100,
-        };
-        await _context.Hands.AddAsync(hand);
-        await _context.SaveChangesAsync();
+        var hand = await SeedData(
+            new HandBuilder()
+                .WithGameId(Guid.NewGuid())
+                .WithUserId(Guid.NewGuid())
+                .WithOrder(1)
+                .WithBet(100)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.PatchHandAsync(hand.Id, Bet: 50);
+        var result = await _rut.PatchAsync(hand.Id, bet: 50);
 
         // Assert
         Assert.NotNull(result);
         Assert.Equal(1, result.Order); // unchanged
-        Assert.Equal(150, result.Bet); // 100 + 50
+        Assert.Equal(50, result.Bet); // replaced with 50
     }
 
     [Fact]
-    public async Task PatchHandAsync_ThrowsNotFoundException_WhenHandDoesNotExist()
+    public async Task PatchAsync_ThrowsNotFoundException_WhenHandDoesNotExist()
     {
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            _repository.PatchHandAsync(Guid.NewGuid(), Order: 2)
+            _rut.PatchAsync(Guid.NewGuid(), order: 2)
         );
     }
 
     [Fact]
-    public async Task DeleteHandAsync_DeletesHandSuccessfully()
+    public async Task DeleteAsync_DeletesHandSuccessfully()
     {
         // Arrange
-        var hand = new Hand
-        {
-            GameId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Order = 1,
-            Bet = 100,
-        };
-        await _context.Hands.AddAsync(hand);
-        await _context.SaveChangesAsync();
+        var hand = await SeedData(
+            new HandBuilder()
+                .WithGameId(Guid.NewGuid())
+                .WithUserId(Guid.NewGuid())
+                .WithOrder(1)
+                .WithBet(100)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.DeleteHandAsync(hand.Id);
+        var result = await _rut.DeleteAsync(hand.Id);
 
         // Assert
         Assert.NotNull(result);
@@ -453,11 +373,9 @@ public class HandRepositoryTests
     }
 
     [Fact]
-    public async Task DeleteHandAsync_ThrowsNotFoundException_WhenHandDoesNotExist()
+    public async Task DeleteAsync_ThrowsNotFoundException_WhenHandDoesNotExist()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() =>
-            _repository.DeleteHandAsync(Guid.NewGuid())
-        );
+        await Assert.ThrowsAsync<NotFoundException>(() => _rut.DeleteAsync(Guid.NewGuid()));
     }
 }

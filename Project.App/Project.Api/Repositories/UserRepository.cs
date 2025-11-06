@@ -13,7 +13,7 @@ public class UserRepository(AppDbContext context, ILogger<UserRepository> logger
     /// Get all users.
     /// </summary>
     public async Task<IReadOnlyList<User>> GetAllAsync(int? skip = null, int? take = null) =>
-        await GetAllAsync(skip: skip, take: take);
+        await base.GetAllAsync(skip: skip, take: take);
 
     /// <summary>
     /// Get a user by their ID. Returns a read-only user.
@@ -29,17 +29,22 @@ public class UserRepository(AppDbContext context, ILogger<UserRepository> logger
         );
 
     /// <summary>
+    /// Check if a user exists by their ID.
+    /// </summary>
+    public new async Task<bool> ExistsAsync(Guid id) => await base.ExistsAsync(id);
+
+    /// <summary>
     /// Create a new user.
     /// </summary>
-    public new async Task<User> CreateAsync(User user) => await CreateAsync(user);
+    public new async Task<User> CreateAsync(User user) => await base.CreateAsync(user);
 
     /// <summary>
     /// Update an existing user.
     /// </summary>
-    public new async Task<User> UpdateAsync(User user) => await UpdateAsync(user);
+    public new async Task<User> UpdateAsync(User user) => await base.UpdateAsync(user);
 
     /// <summary>
-    /// Update user balance.
+    /// Update user balance with a new value.
     /// </summary>
     public async Task<User> UpdateBalanceAsync(Guid id, double balance) =>
         await UpdateAsync(id, u => u.Balance = balance);
@@ -47,5 +52,5 @@ public class UserRepository(AppDbContext context, ILogger<UserRepository> logger
     /// <summary>
     /// Delete a user by their ID.
     /// </summary>
-    public new async Task<User> DeleteAsync(Guid id) => await DeleteAsync(id);
+    public new async Task<User> DeleteAsync(Guid id) => await base.DeleteAsync(id);
 }

@@ -1,81 +1,35 @@
 using Microsoft.EntityFrameworkCore;
-using Project.Api.Data;
 using Project.Api.Models;
 using Project.Api.Repositories;
 using Project.Api.Utilities;
 using Project.Api.Utilities.Enums;
+using Project.Test.Helpers;
+using Project.Test.Helpers.Builders;
 
 namespace Project.Test.Repositories;
 
-public class RoomPlayerRepositoryTests
+public class RoomPlayerRepositoryTests : RepositoryTestBase<RoomPlayerRepository, RoomPlayer>
 {
-    private readonly AppDbContext _context;
-    private readonly RoomPlayerRepository _repository;
-
-    public RoomPlayerRepositoryTests()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
-
-        _context = new AppDbContext(options);
-        _repository = new RoomPlayerRepository(_context);
-    }
-
-    private async Task<User> CreateTestUser(
-        string email = "test@example.com",
-        string name = "Test User"
-    )
-    {
-        var user = new User { Email = email, Name = name };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-        return user;
-    }
-
-    private async Task<Room> CreateTestRoom(Guid hostId, string description = "Test Room")
-    {
-        var room = new Room
-        {
-            HostId = hostId,
-            Description = description,
-            MaxPlayers = 4,
-            MinPlayers = 2,
-            IsPublic = true,
-            IsActive = true,
-        };
-        await _context.Rooms.AddAsync(room);
-        await _context.SaveChangesAsync();
-        return room;
-    }
-
-    private async Task<RoomPlayer> CreateTestRoomPlayer(
-        Guid roomId,
-        Guid userId,
-        Status status = Status.Active
-    )
-    {
-        var roomPlayer = new RoomPlayer
-        {
-            RoomId = roomId,
-            UserId = userId,
-            Status = status,
-        };
-        await _context.RoomPlayers.AddAsync(roomPlayer);
-        await _context.SaveChangesAsync();
-        return roomPlayer;
-    }
-
     [Fact]
-    public async Task GetRoomPlayerByIdAsync_ReturnsRoomPlayer_WhenRoomPlayerExists()
+    public async Task GetByRoomIdAndUserIdAsync_ReturnsRoomPlayer_WhenRoomPlayerExists()
     {
         // Arrange
-        var user = await CreateTestUser();
-        var room = await CreateTestRoom(user.Id);
-        var roomPlayer = await CreateTestRoomPlayer(room.Id, user.Id);
+        User user = await SeedData(
+            new UserBuilder().WithEmail("test@example.com").WithName("Test User").Build()
+        );
+        Room room = await SeedData(
+            new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
+        );
+        await SeedData(
+            new RoomPlayerBuilder()
+                .WithRoomId(room.Id)
+                .WithUserId(user.Id)
+                .WithStatus(Status.Active)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetRoomPlayerByIdAsync(room.Id, user.Id);
+        var result = await _rut.GetByRoomIdAndUserIdAsync(room.Id, user.Id);
 
         // Assert
         Assert.NotNull(result);
@@ -85,59 +39,99 @@ public class RoomPlayerRepositoryTests
     }
 
     [Fact]
-    public async Task GetRoomPlayerByIdAsync_ReturnsNull_WhenRoomPlayerDoesNotExist()
+    public async Task GetByRoomIdAndUserIdAsync_ReturnsNull_WhenRoomPlayerDoesNotExist()
     {
         // Act
-        var result = await _repository.GetRoomPlayerByIdAsync(Guid.NewGuid(), Guid.NewGuid());
+        var result = await _rut.GetByRoomIdAndUserIdAsync(Guid.NewGuid(), Guid.NewGuid());
 
         // Assert
         Assert.Null(result);
     }
 
     [Fact]
-    public async Task GetAllRoomPlayersAsync_ReturnsAllRoomPlayers()
+    public async Task GetAllAsync_ReturnsAllRoomPlayers()
     {
         // Arrange
-        var user1 = await CreateTestUser("user1@test.com", "User 1");
-        var user2 = await CreateTestUser("user2@test.com", "User 2");
-        var room1 = await CreateTestRoom(user1.Id, "Room 1");
-        var room2 = await CreateTestRoom(user2.Id, "Room 2");
+        User user1 = await SeedData(
+            new UserBuilder().WithEmail("user1@test.com").WithName("User 1").Build()
+        );
+        User user2 = await SeedData(
+            new UserBuilder().WithEmail("user2@test.com").WithName("User 2").Build()
+        );
+        Room room1 = await SeedData(
+            new RoomBuilder().WithHostId(user1.Id).WithDescription("Room 1").Build()
+        );
+        Room room2 = await SeedData(
+            new RoomBuilder().WithHostId(user2.Id).WithDescription("Room 2").Build()
+        );
 
-        await CreateTestRoomPlayer(room1.Id, user1.Id);
-        await CreateTestRoomPlayer(room2.Id, user2.Id);
+        await SeedData(
+            new RoomPlayerBuilder()
+                .WithRoomId(room1.Id)
+                .WithUserId(user1.Id)
+                .WithStatus(Status.Active)
+                .Build(),
+            new RoomPlayerBuilder()
+                .WithRoomId(room2.Id)
+                .WithUserId(user2.Id)
+                .WithStatus(Status.Active)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetAllRoomPlayersAsync();
+        var result = await _rut.GetAllAsync();
 
         // Assert
         Assert.Equal(2, result.Count);
     }
 
     [Fact]
-    public async Task GetAllRoomPlayersAsync_ReturnsEmptyList_WhenNoRoomPlayersExist()
+    public async Task GetAllAsync_ReturnsEmptyList_WhenNoRoomPlayersExist()
     {
         // Act
-        var result = await _repository.GetAllRoomPlayersAsync();
+        var result = await _rut.GetAllAsync();
 
         // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task GetRoomPlayersByRoomIdAsync_ReturnsRoomPlayers_ForSpecificRoom()
+    public async Task GetAllByRoomIdAsync_ReturnsRoomPlayers_ForSpecificRoom()
     {
         // Arrange
-        var user1 = await CreateTestUser("user1@test.com", "User 1");
-        var user2 = await CreateTestUser("user2@test.com", "User 2");
-        var room1 = await CreateTestRoom(user1.Id, "Room 1");
-        var room2 = await CreateTestRoom(user2.Id, "Room 2");
+        User user1 = await SeedData(
+            new UserBuilder().WithEmail("user1@test.com").WithName("User 1").Build()
+        );
+        User user2 = await SeedData(
+            new UserBuilder().WithEmail("user2@test.com").WithName("User 2").Build()
+        );
+        Room room1 = await SeedData(
+            new RoomBuilder().WithHostId(user1.Id).WithDescription("Room 1").Build()
+        );
+        Room room2 = await SeedData(
+            new RoomBuilder().WithHostId(user2.Id).WithDescription("Room 2").Build()
+        );
 
-        await CreateTestRoomPlayer(room1.Id, user1.Id);
-        await CreateTestRoomPlayer(room1.Id, user2.Id);
-        await CreateTestRoomPlayer(room2.Id, user1.Id);
+        await SeedData(
+            new RoomPlayerBuilder()
+                .WithRoomId(room1.Id)
+                .WithUserId(user1.Id)
+                .WithStatus(Status.Active)
+                .Build(),
+            new RoomPlayerBuilder()
+                .WithRoomId(room1.Id)
+                .WithUserId(user2.Id)
+                .WithStatus(Status.Active)
+                .Build(),
+            new RoomPlayerBuilder()
+                .WithRoomId(room2.Id)
+                .WithUserId(user1.Id)
+                .WithStatus(Status.Active)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetRoomPlayersByRoomIdAsync(room1.Id);
+        var result = await _rut.GetAllByRoomIdAsync(room1.Id);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -145,34 +139,57 @@ public class RoomPlayerRepositoryTests
     }
 
     [Fact]
-    public async Task GetRoomPlayersByRoomIdAsync_ReturnsEmptyList_WhenNoPlayersInRoom()
+    public async Task GetAllByRoomIdAsync_ReturnsEmptyList_WhenNoPlayersInRoom()
     {
         // Arrange
-        var user = await CreateTestUser();
-        var room = await CreateTestRoom(user.Id);
+        User user = await SeedData(
+            new UserBuilder().WithEmail("test@example.com").WithName("Test User").Build()
+        );
+        Room room = await SeedData(
+            new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
+        );
 
         // Act
-        var result = await _repository.GetRoomPlayersByRoomIdAsync(room.Id);
+        var result = await _rut.GetAllByRoomIdAsync(room.Id);
 
         // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task GetRoomPlayersByUserIdAsync_ReturnsRoomPlayers_ForSpecificUser()
+    public async Task GetAllByUserIdAsync_ReturnsRoomPlayers_ForSpecificUser()
     {
         // Arrange
-        var user1 = await CreateTestUser("user1@test.com", "User 1");
-        var user2 = await CreateTestUser("user2@test.com", "User 2");
-        var room1 = await CreateTestRoom(user1.Id, "Room 1");
-        var room2 = await CreateTestRoom(user2.Id, "Room 2");
+        var user1 = await SeedData(
+            new UserBuilder().WithEmail("user1@test.com").WithName("User 1").Build()
+        );
+        var user2 = await SeedData(
+            new UserBuilder().WithEmail("user2@test.com").WithName("User 2").Build()
+        );
+        var room1 = await SeedData(
+            new RoomBuilder().WithHostId(user1.Id).WithDescription("Room 1").Build()
+        );
+        var room2 = await SeedData(
+            new RoomBuilder().WithHostId(user2.Id).WithDescription("Room 2").Build()
+        );
 
-        await CreateTestRoomPlayer(room1.Id, user1.Id);
-        await CreateTestRoomPlayer(room2.Id, user1.Id);
-        await CreateTestRoomPlayer(room1.Id, user2.Id);
+        await SeedData<RoomPlayer>(
+            new RoomPlayerBuilder()
+                .WithRoomId(room1.Id)
+                .WithUserId(user1.Id)
+                .WithStatus(Status.Active),
+            new RoomPlayerBuilder()
+                .WithRoomId(room2.Id)
+                .WithUserId(user1.Id)
+                .WithStatus(Status.Active),
+            new RoomPlayerBuilder()
+                .WithRoomId(room1.Id)
+                .WithUserId(user2.Id)
+                .WithStatus(Status.Active)
+        );
 
         // Act
-        var result = await _repository.GetRoomPlayersByUserIdAsync(user1.Id);
+        var result = await _rut.GetAllByUserIdAsync(user1.Id);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -180,24 +197,42 @@ public class RoomPlayerRepositoryTests
     }
 
     [Fact]
-    public async Task GetPlayersInRoomByStatusAsync_ReturnsPlayersByStatus()
+    public async Task GetAllInRoomByStatusAsync_ReturnsPlayersByStatus()
     {
         // Arrange
-        var user1 = await CreateTestUser("user1@test.com", "User 1");
-        var user2 = await CreateTestUser("user2@test.com", "User 2");
-        var user3 = await CreateTestUser("user3@test.com", "User 3");
-        var room = await CreateTestRoom(user1.Id);
+        var user1 = await SeedData(
+            new UserBuilder().WithEmail("user1@test.com").WithName("User 1").Build()
+        );
+        var user2 = await SeedData(
+            new UserBuilder().WithEmail("user2@test.com").WithName("User 2").Build()
+        );
+        var user3 = await SeedData(
+            new UserBuilder().WithEmail("user3@test.com").WithName("User 3").Build()
+        );
+        var room = await SeedData(
+            new RoomBuilder().WithHostId(user1.Id).WithDescription("Test Room").Build()
+        );
 
-        await CreateTestRoomPlayer(room.Id, user1.Id, Status.Active);
-        await CreateTestRoomPlayer(room.Id, user2.Id, Status.Inactive);
-        await CreateTestRoomPlayer(room.Id, user3.Id, Status.Away);
+        await SeedData(
+            new RoomPlayerBuilder()
+                .WithRoomId(room.Id)
+                .WithUserId(user1.Id)
+                .WithStatus(Status.Active)
+                .Build(),
+            new RoomPlayerBuilder()
+                .WithRoomId(room.Id)
+                .WithUserId(user2.Id)
+                .WithStatus(Status.Inactive)
+                .Build(),
+            new RoomPlayerBuilder()
+                .WithRoomId(room.Id)
+                .WithUserId(user3.Id)
+                .WithStatus(Status.Away)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetPlayersInRoomByStatusAsync(
-            room.Id,
-            Status.Active,
-            Status.Away
-        );
+        var result = await _rut.GetAllInRoomByStatusAsync(room.Id, Status.Active, Status.Away);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -207,20 +242,23 @@ public class RoomPlayerRepositoryTests
     }
 
     [Fact]
-    public async Task CreateRoomPlayerAsync_CreatesRoomPlayerSuccessfully()
+    public async Task CreateAsync_CreatesRoomPlayerSuccessfully()
     {
         // Arrange
-        var user = await CreateTestUser();
-        var room = await CreateTestRoom(user.Id);
-        var roomPlayer = new RoomPlayer
-        {
-            RoomId = room.Id,
-            UserId = user.Id,
-            Status = Status.Active,
-        };
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@example.com").WithName("Test User").Build()
+        );
+        var room = await SeedData(
+            new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
+        );
+        var roomPlayer = new RoomPlayerBuilder()
+            .WithRoomId(room.Id)
+            .WithUserId(user.Id)
+            .WithStatus(Status.Active)
+            .Build();
 
         // Act
-        var result = await _repository.CreateRoomPlayerAsync(roomPlayer);
+        var result = await _rut.CreateAsync(roomPlayer);
 
         // Assert
         Assert.NotNull(result);
@@ -233,22 +271,31 @@ public class RoomPlayerRepositoryTests
     }
 
     [Fact]
-    public async Task UpdateRoomPlayerAsync_UpdatesRoomPlayerSuccessfully()
+    public async Task UpdateAsync_UpdatesRoomPlayerSuccessfully()
     {
         // Arrange
-        var user = await CreateTestUser();
-        var room = await CreateTestRoom(user.Id);
-        var roomPlayer = await CreateTestRoomPlayer(room.Id, user.Id);
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@example.com").WithName("Test User").Build()
+        );
+        var room = await SeedData(
+            new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
+        );
+        var roomPlayer = await SeedData(
+            new RoomPlayerBuilder()
+                .WithRoomId(room.Id)
+                .WithUserId(user.Id)
+                .WithStatus(Status.Active)
+                .Build()
+        );
 
-        var updatedRoomPlayer = new RoomPlayer
-        {
-            RoomId = room.Id,
-            UserId = user.Id,
-            Status = Status.Inactive,
-        };
+        var updatedRoomPlayer = new RoomPlayerBuilder()
+            .WithRoomId(room.Id)
+            .WithUserId(user.Id)
+            .WithStatus(Status.Inactive)
+            .Build();
 
         // Act
-        var result = await _repository.UpdateRoomPlayerAsync(updatedRoomPlayer);
+        var result = await _rut.UpdateAsync(updatedRoomPlayer);
 
         // Assert
         Assert.NotNull(result);
@@ -256,15 +303,25 @@ public class RoomPlayerRepositoryTests
     }
 
     [Fact]
-    public async Task DeleteRoomPlayerAsync_DeletesRoomPlayerSuccessfully()
+    public async Task DeleteAsync_DeletesRoomPlayerSuccessfully()
     {
         // Arrange
-        var user = await CreateTestUser();
-        var room = await CreateTestRoom(user.Id);
-        var roomPlayer = await CreateTestRoomPlayer(room.Id, user.Id);
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@example.com").WithName("Test User").Build()
+        );
+        var room = await SeedData(
+            new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
+        );
+        var roomPlayer = await SeedData(
+            new RoomPlayerBuilder()
+                .WithRoomId(room.Id)
+                .WithUserId(user.Id)
+                .WithStatus(Status.Active)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.DeleteRoomPlayerAsync(roomPlayer.RoomId, roomPlayer.UserId);
+        var result = await _rut.DeleteAsync(roomPlayer.RoomId, roomPlayer.UserId);
 
         // Assert
         Assert.NotNull(result);
@@ -278,51 +335,71 @@ public class RoomPlayerRepositoryTests
     }
 
     [Fact]
-    public async Task DeleteRoomPlayerAsync_ThrowsNotFoundException_WhenRoomPlayerDoesNotExist()
+    public async Task DeleteAsync_ThrowsNotFoundException_WhenRoomPlayerDoesNotExist()
     {
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            _repository.DeleteRoomPlayerAsync(Guid.NewGuid(), Guid.NewGuid())
+            _rut.DeleteAsync(Guid.NewGuid(), Guid.NewGuid())
         );
     }
 
     [Fact]
-    public async Task IsPlayerInRoomAsync_ReturnsFalse_WhenPlayerIsNotInRoom()
+    public async Task RoomHasPlayerAsync_ReturnsFalse_WhenPlayerIsNotInRoom()
     {
         // Act
-        var result = await _repository.IsPlayerInRoomAsync(Guid.NewGuid(), Guid.NewGuid());
+        var result = await _rut.RoomHasPlayerAsync(Guid.NewGuid(), Guid.NewGuid());
 
         // Assert
         Assert.False(result);
     }
 
     [Fact]
-    public async Task GetPlayerCountInRoomAsync_ReturnsCorrectCount()
+    public async Task GetPlayerCountAsync_ReturnsCorrectCount()
     {
         // Arrange
-        var user1 = await CreateTestUser("user1@test.com", "User 1");
-        var user2 = await CreateTestUser("user2@test.com", "User 2");
-        var room = await CreateTestRoom(user1.Id);
+        var user1 = await SeedData(
+            new UserBuilder().WithEmail("user1@test.com").WithName("User 1").Build()
+        );
+        var user2 = await SeedData(
+            new UserBuilder().WithEmail("user2@test.com").WithName("User 2").Build()
+        );
+        var room = await SeedData(
+            new RoomBuilder().WithHostId(user1.Id).WithDescription("Test Room").Build()
+        );
 
-        await CreateTestRoomPlayer(room.Id, user1.Id);
-        await CreateTestRoomPlayer(room.Id, user2.Id);
+        await SeedData(
+            new RoomPlayerBuilder()
+                .WithRoomId(room.Id)
+                .WithUserId(user1.Id)
+                .WithStatus(Status.Active)
+                .Build(),
+            new RoomPlayerBuilder()
+                .WithRoomId(room.Id)
+                .WithUserId(user2.Id)
+                .WithStatus(Status.Active)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetPlayerCountInRoomAsync(room.Id);
+        var result = await _rut.GetPlayerCountAsync(room.Id);
 
         // Assert
         Assert.Equal(2, result);
     }
 
     [Fact]
-    public async Task GetPlayerCountInRoomAsync_ReturnsZero_WhenNoPlayersInRoom()
+    public async Task GetPlayerCountAsync_ReturnsZero_WhenNoPlayersInRoom()
     {
         // Arrange
-        var user = await CreateTestUser();
-        var room = await CreateTestRoom(user.Id);
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@example.com").WithName("Test User").Build()
+        );
+        var room = await SeedData(
+            new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
+        );
 
         // Act
-        var result = await _repository.GetPlayerCountInRoomAsync(room.Id);
+        var result = await _rut.GetPlayerCountAsync(room.Id);
 
         // Assert
         Assert.Equal(0, result);
@@ -332,12 +409,22 @@ public class RoomPlayerRepositoryTests
     public async Task UpdatePlayerStatusAsync_UpdatesStatusSuccessfully()
     {
         // Arrange
-        var user = await CreateTestUser();
-        var room = await CreateTestRoom(user.Id);
-        var roomPlayer = await CreateTestRoomPlayer(room.Id, user.Id, Status.Active);
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@example.com").WithName("Test User").Build()
+        );
+        var room = await SeedData(
+            new RoomBuilder().WithHostId(user.Id).WithDescription("Test Room").Build()
+        );
+        var roomPlayer = await SeedData(
+            new RoomPlayerBuilder()
+                .WithRoomId(room.Id)
+                .WithUserId(user.Id)
+                .WithStatus(Status.Active)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.UpdatePlayerStatusAsync(
+        var result = await _rut.UpdatePlayerStatusAsync(
             roomPlayer.RoomId,
             roomPlayer.UserId,
             Status.Inactive
@@ -353,7 +440,7 @@ public class RoomPlayerRepositoryTests
     {
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            _repository.UpdatePlayerStatusAsync(Guid.NewGuid(), Guid.NewGuid(), Status.Active)
+            _rut.UpdatePlayerStatusAsync(Guid.NewGuid(), Guid.NewGuid(), Status.Active)
         );
     }
 }

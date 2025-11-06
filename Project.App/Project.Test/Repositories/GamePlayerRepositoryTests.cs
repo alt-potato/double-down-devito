@@ -1,47 +1,32 @@
 using Microsoft.EntityFrameworkCore;
-using Project.Api.Data;
 using Project.Api.Models;
 using Project.Api.Repositories;
 using Project.Api.Utilities;
+using Project.Test.Helpers;
+using Project.Test.Helpers.Builders;
 
 namespace Project.Test.Repositories;
 
-public class GamePlayerRepositoryTests
+public class GamePlayerRepositoryTests : RepositoryTestBase<GamePlayerRepository, GamePlayer>
 {
-    private readonly AppDbContext _context;
-    private readonly GamePlayerRepository _repository;
-
-    public GamePlayerRepositoryTests()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
-
-        _context = new AppDbContext(options);
-        _repository = new GamePlayerRepository(_context);
-    }
-
     [Fact]
-    public async Task GetGamePlayerByGameIdAndUserIdAsync_ReturnsGamePlayer_WhenExists()
+    public async Task GetByGameIdAndUserIdAsync_ReturnsGamePlayer_WhenExists()
     {
         // Arrange
-        var game = new Game { GameMode = "Blackjack", GameState = "{}" };
-        var user = new User { Email = "test@test.com", Name = "Test User" };
-        await _context.Games.AddAsync(game);
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var gamePlayer = new GamePlayer
-        {
-            GameId = game.Id,
-            UserId = user.Id,
-            Balance = 1000,
-        };
-        await _context.GamePlayers.AddAsync(gamePlayer);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1000)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetGamePlayerByGameIdAndUserIdAsync(game.Id, user.Id);
+        var result = await _rut.GetByGameIdAndUserIdAsync(game.Id, user.Id);
 
         // Assert
         Assert.NotNull(result);
@@ -51,61 +36,42 @@ public class GamePlayerRepositoryTests
     }
 
     [Fact]
-    public async Task GetGamePlayerByGameIdAndUserIdAsync_ReturnsNull_WhenDoesNotExist()
+    public async Task GetByGameIdAndUserIdAsync_ReturnsNull_WhenDoesNotExist()
     {
         // Act
-        var result = await _repository.GetGamePlayerByGameIdAndUserIdAsync(
-            Guid.NewGuid(),
-            Guid.NewGuid()
-        );
+        var result = await _rut.GetByGameIdAndUserIdAsync(Guid.NewGuid(), Guid.NewGuid());
 
         // Assert
         Assert.Null(result);
     }
 
     [Fact]
-    public async Task GetGamePlayerByGameIdAndUserIdAsync_ThrowsArgumentException_WhenInvalidIds()
-    {
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            _repository.GetGamePlayerByGameIdAndUserIdAsync(Guid.Empty, Guid.NewGuid())
-        );
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            _repository.GetGamePlayerByGameIdAndUserIdAsync(Guid.NewGuid(), Guid.Empty)
-        );
-    }
-
-    [Fact]
-    public async Task GetGamePlayersByGameIdAsync_ReturnsGamePlayers_WhenExist()
+    public async Task GetAllByGameIdAsync_ReturnsGamePlayers_WhenExist()
     {
         // Arrange
-        var game = new Game { GameMode = "Blackjack", GameState = "{}" };
-        var user1 = new User { Email = "user1@test.com", Name = "User 1" };
-        var user2 = new User { Email = "user2@test.com", Name = "User 2" };
-        await _context.Games.AddAsync(game);
-        await _context.Users.AddRangeAsync(user1, user2);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user1 = await SeedData(
+            new UserBuilder().WithEmail("user1@test.com").WithName("User 1").Build()
+        );
+        var user2 = await SeedData(
+            new UserBuilder().WithEmail("user2@test.com").WithName("User 2").Build()
+        );
 
-        var gamePlayers = new[]
-        {
-            new GamePlayer
-            {
-                GameId = game.Id,
-                UserId = user1.Id,
-                Balance = 1000,
-            },
-            new GamePlayer
-            {
-                GameId = game.Id,
-                UserId = user2.Id,
-                Balance = 1500,
-            },
-        };
-        await _context.GamePlayers.AddRangeAsync(gamePlayers);
-        await _context.SaveChangesAsync();
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user1.Id)
+                .WithBalance(1000)
+                .Build(),
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user2.Id)
+                .WithBalance(1500)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetGamePlayersByGameIdAsync(game.Id);
+        var result = await _rut.GetAllByGameIdAsync(game.Id);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -113,60 +79,43 @@ public class GamePlayerRepositoryTests
     }
 
     [Fact]
-    public async Task GetGamePlayersByGameIdAsync_ReturnsEmpty_WhenNoPlayers()
+    public async Task GetAllByGameIdAsync_ReturnsEmpty_WhenNoPlayers()
     {
         // Arrange
-        var game = new Game { GameMode = "Blackjack", GameState = "{}" };
-        await _context.Games.AddAsync(game);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
 
         // Act
-        var result = await _repository.GetGamePlayersByGameIdAsync(game.Id);
+        var result = await _rut.GetAllByGameIdAsync(game.Id);
 
         // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task GetGamePlayersByGameIdAsync_ThrowsArgumentException_WhenInvalidGameId()
-    {
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            _repository.GetGamePlayersByGameIdAsync(Guid.Empty)
-        );
-    }
-
-    [Fact]
-    public async Task GetGamePlayersByUserIdAsync_ReturnsGamePlayers_WhenExist()
+    public async Task GetAllByUserIdAsync_ReturnsGamePlayers_WhenExist()
     {
         // Arrange
-        var game1 = new Game { GameMode = "Blackjack", GameState = "{}" };
-        var game2 = new Game { GameMode = "Poker", GameState = "{}" };
-        var user = new User { Email = "test@test.com", Name = "Test User" };
-        await _context.Games.AddRangeAsync(game1, game2);
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
+        var game1 = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var game2 = await SeedData(new GameBuilder().WithGameMode("Poker").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
 
-        var gamePlayers = new[]
-        {
-            new GamePlayer
-            {
-                GameId = game1.Id,
-                UserId = user.Id,
-                Balance = 1000,
-            },
-            new GamePlayer
-            {
-                GameId = game2.Id,
-                UserId = user.Id,
-                Balance = 1500,
-            },
-        };
-        await _context.GamePlayers.AddRangeAsync(gamePlayers);
-        await _context.SaveChangesAsync();
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game1.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1000)
+                .Build(),
+            new GamePlayerBuilder()
+                .WithGameId(game2.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1500)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.GetGamePlayersByUserIdAsync(user.Id);
+        var result = await _rut.GetAllByUserIdAsync(user.Id);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -174,48 +123,36 @@ public class GamePlayerRepositoryTests
     }
 
     [Fact]
-    public async Task GetGamePlayersByUserIdAsync_ReturnsEmpty_WhenNoGames()
+    public async Task GetAllByUserIdAsync_ReturnsEmpty_WhenNoGames()
     {
         // Arrange
-        var user = new User { Email = "test@test.com", Name = "Test User" };
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
 
         // Act
-        var result = await _repository.GetGamePlayersByUserIdAsync(user.Id);
+        var result = await _rut.GetAllByUserIdAsync(user.Id);
 
         // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task GetGamePlayersByUserIdAsync_ThrowsArgumentException_WhenInvalidUserId()
-    {
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            _repository.GetGamePlayersByUserIdAsync(Guid.Empty)
-        );
-    }
-
-    [Fact]
-    public async Task CreateGamePlayerAsync_CreatesGamePlayerSuccessfully()
+    public async Task CreateAsync_CreatesGamePlayerSuccessfully()
     {
         // Arrange
-        var game = new Game { GameMode = "Blackjack", GameState = "{}" };
-        var user = new User { Email = "test@test.com", Name = "Test User" };
-        await _context.Games.AddAsync(game);
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var gamePlayer = new GamePlayer
-        {
-            GameId = game.Id,
-            UserId = user.Id,
-            Balance = 1000,
-        };
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
+        var gamePlayer = new GamePlayerBuilder()
+            .WithGameId(game.Id)
+            .WithUserId(user.Id)
+            .WithBalance(1000)
+            .Build();
 
         // Act
-        var result = await _repository.CreateGamePlayerAsync(gamePlayer);
+        var result = await _rut.CreateAsync(gamePlayer);
 
         // Assert
         Assert.NotNull(result);
@@ -228,44 +165,38 @@ public class GamePlayerRepositoryTests
     }
 
     [Fact]
-    public async Task CreateGamePlayerAsync_ThrowsArgumentNullException_WhenGamePlayerIsNull()
+    public async Task CreateAsync_ThrowsBadRequestException_WhenGamePlayerIsNull()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            _repository.CreateGamePlayerAsync(null!)
-        );
+        await Assert.ThrowsAsync<BadRequestException>(() => _rut.CreateAsync(null!));
     }
 
     [Fact]
-    public async Task UpdateGamePlayerAsync_UpdatesGamePlayerSuccessfully()
+    public async Task UpdateAsync_UpdatesGamePlayerSuccessfully()
     {
         // Arrange
-        var game = new Game { GameMode = "Blackjack", GameState = "{}" };
-        var user = new User { Email = "test@test.com", Name = "Test User" };
-        await _context.Games.AddAsync(game);
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1000)
+                .WithBalanceDelta(0)
+                .Build()
+        );
 
-        var gamePlayer = new GamePlayer
-        {
-            GameId = game.Id,
-            UserId = user.Id,
-            Balance = 1000,
-            BalanceDelta = 0,
-        };
-        await _context.GamePlayers.AddAsync(gamePlayer);
-        await _context.SaveChangesAsync();
-
-        var updatedGamePlayer = new GamePlayer
-        {
-            GameId = game.Id,
-            UserId = user.Id,
-            Balance = 1500,
-            BalanceDelta = 500,
-        };
+        var updatedGamePlayer = new GamePlayerBuilder()
+            .WithGameId(game.Id)
+            .WithUserId(user.Id)
+            .WithBalance(1500)
+            .WithBalanceDelta(500)
+            .Build();
 
         // Act
-        var result = await _repository.UpdateGamePlayerAsync(game.Id, user.Id, updatedGamePlayer);
+        var result = await _rut.UpdateAsync(updatedGamePlayer);
 
         // Assert
         Assert.NotNull(result);
@@ -274,44 +205,38 @@ public class GamePlayerRepositoryTests
     }
 
     [Fact]
-    public async Task UpdateGamePlayerAsync_ThrowsNotFoundException_WhenGamePlayerDoesNotExist()
+    public async Task UpdateAsync_ThrowsNotFoundException_WhenGamePlayerDoesNotExist()
     {
         // Arrange
-        var gamePlayer = new GamePlayer
-        {
-            GameId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Balance = 1000,
-        };
+        var gamePlayer = new GamePlayerBuilder()
+            .WithGameId(Guid.NewGuid())
+            .WithUserId(Guid.NewGuid())
+            .WithBalance(1000)
+            .Build();
 
         // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() =>
-            _repository.UpdateGamePlayerAsync(gamePlayer.GameId, gamePlayer.UserId, gamePlayer)
-        );
+        await Assert.ThrowsAsync<NotFoundException>(() => _rut.UpdateAsync(gamePlayer));
     }
 
     [Fact]
-    public async Task UpdateGamePlayerBalanceAsync_UpdatesBalanceSuccessfully()
+    public async Task UpdateBalanceAsync_UpdatesBalanceSuccessfully()
     {
         // Arrange
-        var game = new Game { GameMode = "Blackjack", GameState = "{}" };
-        var user = new User { Email = "test@test.com", Name = "Test User" };
-        await _context.Games.AddAsync(game);
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var gamePlayer = new GamePlayer
-        {
-            GameId = game.Id,
-            UserId = user.Id,
-            Balance = 1000,
-            BalanceDelta = 0,
-        };
-        await _context.GamePlayers.AddAsync(gamePlayer);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1000)
+                .WithBalanceDelta(0)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.UpdateGamePlayerBalanceAsync(game.Id, user.Id, 500);
+        var result = await _rut.UpdateBalanceAsync(game.Id, user.Id, 500);
 
         // Assert
         Assert.NotNull(result);
@@ -320,35 +245,32 @@ public class GamePlayerRepositoryTests
     }
 
     [Fact]
-    public async Task UpdateGamePlayerBalanceAsync_ThrowsNotFoundException_WhenGamePlayerDoesNotExist()
+    public async Task UpdateBalanceAsync_ThrowsNotFoundException_WhenGamePlayerDoesNotExist()
     {
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            _repository.UpdateGamePlayerBalanceAsync(Guid.NewGuid(), Guid.NewGuid(), 500)
+            _rut.UpdateBalanceAsync(Guid.NewGuid(), Guid.NewGuid(), 500)
         );
     }
 
     [Fact]
-    public async Task DeleteGamePlayerAsync_DeletesGamePlayerSuccessfully()
+    public async Task DeleteAsync_DeletesGamePlayerSuccessfully()
     {
         // Arrange
-        var game = new Game { GameMode = "Blackjack", GameState = "{}" };
-        var user = new User { Email = "test@test.com", Name = "Test User" };
-        await _context.Games.AddAsync(game);
-        await _context.Users.AddAsync(user);
-        await _context.SaveChangesAsync();
-
-        var gamePlayer = new GamePlayer
-        {
-            GameId = game.Id,
-            UserId = user.Id,
-            Balance = 1000,
-        };
-        await _context.GamePlayers.AddAsync(gamePlayer);
-        await _context.SaveChangesAsync();
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
+        var gamePlayer = await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1000)
+                .Build()
+        );
 
         // Act
-        var result = await _repository.DeleteGamePlayerAsync(game.Id, user.Id);
+        var result = await _rut.DeleteAsync(game.Id, user.Id);
 
         // Assert
         Assert.NotNull(result);
@@ -360,11 +282,94 @@ public class GamePlayerRepositoryTests
     }
 
     [Fact]
-    public async Task DeleteGamePlayerAsync_ThrowsNotFoundException_WhenGamePlayerDoesNotExist()
+    public async Task DeleteAsync_ThrowsNotFoundException_WhenGamePlayerDoesNotExist()
     {
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            _repository.DeleteGamePlayerAsync(Guid.NewGuid(), Guid.NewGuid())
+            _rut.DeleteAsync(Guid.NewGuid(), Guid.NewGuid())
         );
+    }
+
+    [Fact]
+    public async Task GetByGameIdAndUserIdAsync_IncludesGameAndUser()
+    {
+        // Arrange
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1000)
+                .Build()
+        );
+
+        // Act
+        var result = await _rut.GetByGameIdAndUserIdAsync(game.Id, user.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.Game);
+        Assert.NotNull(result.User);
+        Assert.Equal("Blackjack", result.Game!.GameMode);
+        Assert.Equal("Test User", result.User!.Name);
+    }
+
+    [Fact]
+    public async Task GetAllByGameIdAsync_IncludesGameAndUser()
+    {
+        // Arrange
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1000)
+                .Build()
+        );
+
+        // Act
+        var result = await _rut.GetAllByGameIdAsync(game.Id);
+
+        // Assert
+        Assert.Single(result);
+        var gamePlayer = result[0];
+        Assert.NotNull(gamePlayer.Game);
+        Assert.NotNull(gamePlayer.User);
+        Assert.Equal("Blackjack", gamePlayer.Game!.GameMode);
+        Assert.Equal("Test User", gamePlayer.User!.Name);
+    }
+
+    [Fact]
+    public async Task GetAllByUserIdAsync_IncludesGameAndUser()
+    {
+        // Arrange
+        var game = await SeedData(new GameBuilder().WithGameMode("Blackjack").Build());
+        var user = await SeedData(
+            new UserBuilder().WithEmail("test@test.com").WithName("Test User").Build()
+        );
+        await SeedData(
+            new GamePlayerBuilder()
+                .WithGameId(game.Id)
+                .WithUserId(user.Id)
+                .WithBalance(1000)
+                .Build()
+        );
+
+        // Act
+        var result = await _rut.GetAllByUserIdAsync(user.Id);
+
+        // Assert
+        Assert.Single(result);
+        var gamePlayer = result[0];
+        Assert.NotNull(gamePlayer.Game);
+        Assert.NotNull(gamePlayer.User);
+        Assert.Equal("Blackjack", gamePlayer.Game!.GameMode);
+        Assert.Equal("Test User", gamePlayer.User!.Name);
     }
 }

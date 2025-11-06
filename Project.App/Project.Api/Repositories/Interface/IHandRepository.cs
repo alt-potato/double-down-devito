@@ -12,12 +12,12 @@ public interface IHandRepository
     /// <summary>
     /// Get all hands in a game.
     /// </summary>
-    Task<IReadOnlyList<Hand>> GetByGameIdAsync(Guid gameId);
+    Task<IReadOnlyList<Hand>> GetAllByGameIdAsync(Guid gameId);
 
     /// <summary>
     /// Get all hands in a specific game for a specific user.
     /// </summary>
-    Task<IReadOnlyList<Hand>> GetByGameIdAndUserIdAsync(Guid gameId, Guid userId);
+    Task<IReadOnlyList<Hand>> GetAllByGameIdAndUserIdAsync(Guid gameId, Guid userId);
 
     /// <summary>
     /// Get a hand by game ID, player order, and hand order.

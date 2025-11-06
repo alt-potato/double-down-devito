@@ -19,7 +19,7 @@ public class RoomRepository(AppDbContext context, ILogger<RoomRepository> logger
     /// Get all rooms.
     /// </summary>
     public async Task<IReadOnlyList<Room>> GetAllAsync(int? skip = null, int? take = null) =>
-        await GetAllAsync(skip: skip, take: take);
+        await base.GetAllAsync(skip: skip, take: take);
 
     /// <summary>
     /// Get all active rooms.
@@ -28,10 +28,10 @@ public class RoomRepository(AppDbContext context, ILogger<RoomRepository> logger
         await GetAllAsync(r => r.IsActive);
 
     /// <summary>
-    /// Get all public rooms.
+    /// Get all public rooms (that are also active).
     /// </summary>
     public async Task<IReadOnlyList<Room>> GetAllPublicAsync() =>
-        await GetAllAsync(r => r.IsPublic);
+        await GetAllAsync(r => r.IsPublic && r.IsActive);
 
     /// <summary>
     /// Get a room by host ID.
@@ -42,20 +42,20 @@ public class RoomRepository(AppDbContext context, ILogger<RoomRepository> logger
     /// <summary>
     /// Create a new room.
     /// </summary>
-    public new async Task<Room> CreateAsync(Room room) => await CreateAsync(room);
+    public new async Task<Room> CreateAsync(Room room) => await base.CreateAsync(room);
 
     /// <summary>
     /// Update an existing room.
     /// </summary>
-    public new async Task<Room> UpdateAsync(Room room) => await UpdateAsync(room);
+    public new async Task<Room> UpdateAsync(Room room) => await base.UpdateAsync(room);
 
     /// <summary>
     /// Delete a room by its ID.
     /// </summary>
-    public new async Task<Room> DeleteAsync(Guid id) => await DeleteAsync(id);
+    public new async Task<Room> DeleteAsync(Guid id) => await base.DeleteAsync(id);
 
     /// <summary>
     /// Check if a room exists by its ID.
     /// </summary>
-    public new async Task<bool> ExistsAsync(Guid id) => await ExistsAsync(id);
+    public new async Task<bool> ExistsAsync(Guid id) => await base.ExistsAsync(id);
 }

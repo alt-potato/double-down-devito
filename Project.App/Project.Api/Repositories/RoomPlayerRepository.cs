@@ -11,6 +11,21 @@ public class RoomPlayerRepository(AppDbContext context, ILogger<RoomPlayerReposi
         IRoomPlayerRepository
 {
     /// <summary>
+    /// Gets an entity by its composite key. If no entity is found, returns null.
+    /// </summary>
+    protected override async Task<RoomPlayer?> GetAsync(
+        Guid roomId,
+        Guid userId,
+        bool tracking = true
+    ) => await GetAsync(r => r.RoomId == roomId && r.UserId == userId, tracking);
+
+    /// <summary>
+    /// Check if an entity exists by its composite key. Lighter than GetAsync.
+    /// </summary>
+    protected override async Task<bool> ExistsAsync(Guid roomId, Guid userId) =>
+        await ExistsAsync(r => r.RoomId == roomId && r.UserId == userId);
+
+    /// <summary>
     /// Get a room player by room ID and user ID.
     /// </summary>
     public Task<RoomPlayer?> GetByRoomIdAndUserIdAsync(Guid roomId, Guid userId) =>
@@ -20,7 +35,7 @@ public class RoomPlayerRepository(AppDbContext context, ILogger<RoomPlayerReposi
     /// Get all room players.
     /// </summary>
     public Task<IReadOnlyList<RoomPlayer>> GetAllAsync(int? skip = null, int? take = null) =>
-        GetAllAsync(skip: skip, take: take);
+        base.GetAllAsync(skip: skip, take: take);
 
     /// <summary>
     /// Get all room players in a room.
@@ -51,18 +66,18 @@ public class RoomPlayerRepository(AppDbContext context, ILogger<RoomPlayerReposi
     /// <summary>
     /// Create a new room player.
     /// </summary>
-    public new Task<RoomPlayer> CreateAsync(RoomPlayer roomPlayer) => CreateAsync(roomPlayer);
+    public new Task<RoomPlayer> CreateAsync(RoomPlayer roomPlayer) => base.CreateAsync(roomPlayer);
 
     /// <summary>
     /// Update an existing room player.
     /// </summary>
-    public new Task<RoomPlayer> UpdateAsync(RoomPlayer roomPlayer) => UpdateAsync(roomPlayer);
+    public new Task<RoomPlayer> UpdateAsync(RoomPlayer roomPlayer) => base.UpdateAsync(roomPlayer);
 
     /// <summary>
     /// Delete a room player by room ID and user ID.
     /// </summary>
     public new Task<RoomPlayer> DeleteAsync(Guid roomId, Guid userId) =>
-        DeleteAsync(roomId, userId);
+        base.DeleteAsync(roomId, userId);
 
     /// <summary>
     /// Check if a player is in a room.

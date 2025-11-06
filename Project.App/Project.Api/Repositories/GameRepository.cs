@@ -34,7 +34,7 @@ public class GameRepository(AppDbContext context, ILogger<GameRepository> logger
                 && (createdAfter == null || g.CreatedAt > createdAfter)
                 && (startedBefore == null || g.StartedAt < startedBefore)
                 && (startedAfter == null || g.StartedAt > startedAfter)
-                && (hasEnded == null || g.EndedAt != null),
+                && (hasEnded == null || (hasEnded.Value ? g.EndedAt != null : g.EndedAt == null)),
             q => q.OrderBy(g => g.CreatedAt),
             q => q.Include(g => g.GamePlayers).ThenInclude(gp => gp.User!), // user should never be null
             skip,

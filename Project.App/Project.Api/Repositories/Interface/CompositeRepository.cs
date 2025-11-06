@@ -25,25 +25,34 @@ public abstract class CompositeRepository<TEntity, TKey1, TKey2>(
     ///
     /// If tracking is true, the entity will be tracked by the context.
     /// </summary>
-    protected async Task<TEntity?> GetAsync(TKey1 key1, TKey2 key2, bool tracking = true) =>
-        await GetAsync((key1, key2).CreateEqualityPredicate<TEntity, TKey1, TKey2>(), tracking);
+    /// <remarks>
+    /// Note that since EF Core can't track the generic key1/key2 methods, it is
+    /// necessary to directly query with the composite keys in any implentation predicates.
+    /// </remarks>
+    protected abstract Task<TEntity?> GetAsync(TKey1 key1, TKey2 key2, bool tracking = true);
 
     /// <summary>
     /// Check if an entity exists by its composite key. Lighter than GetAsync.
     /// </summary>
-    protected async Task<bool> ExistsAsync(TKey1 key1, TKey2 key2) =>
-        await ExistsAsync((key1, key2).CreateEqualityPredicate<TEntity, TKey1, TKey2>());
+    /// <remarks>
+    /// Note that since EF Core can't track the generic key1/key2 methods, it is
+    /// necessary to directly query with the composite keys in any implentation predicates.
+    /// </remarks>
+    protected abstract Task<bool> ExistsAsync(TKey1 key1, TKey2 key2);
 
     /// <summary>
     /// Create a new entity and save it to the database.
     /// </summary>
-    protected async Task<TEntity> CreateAsync(TEntity entity) =>
-        await CreateAsync(entity, $"({entity.Key1}, {entity.Key2})");
+    protected virtual async Task<TEntity> CreateAsync(TEntity entity) =>
+        await CreateAsync(
+            entity ?? throw new BadRequestException($"{typeof(TEntity).Name} cannot be null."),
+            $"({entity.Key1}, {entity.Key2})"
+        );
 
     /// <summary>
     /// Update an existing entity and save it to the database.
     /// </summary>
-    protected async Task<TEntity> UpdateAsync(TEntity entity)
+    protected virtual async Task<TEntity> UpdateAsync(TEntity entity)
     {
         if (entity == null)
         {
@@ -76,7 +85,11 @@ public abstract class CompositeRepository<TEntity, TKey1, TKey2>(
     /// <summary>
     /// Update an existing entity using the provided action and save it to the database.
     /// </summary>
-    protected async Task<TEntity> UpdateAsync(TKey1 key1, TKey2 key2, Action<TEntity> updateAction)
+    protected virtual async Task<TEntity> UpdateAsync(
+        TKey1 key1,
+        TKey2 key2,
+        Action<TEntity> updateAction
+    )
     {
         _logger?.LogDebug(
             "Updating {type} with composite key ({key1}, {key2})",
@@ -102,7 +115,7 @@ public abstract class CompositeRepository<TEntity, TKey1, TKey2>(
     /// <summary>
     /// Update multiple existing entities and save them to the database.
     /// </summary>
-    protected async Task<IReadOnlyList<TEntity>> UpdateRangeAsync(params TEntity[] entities)
+    protected virtual async Task<IReadOnlyList<TEntity>> UpdateRangeAsync(params TEntity[] entities)
     {
         if (entities == null || entities.Length == 0)
         {
@@ -140,7 +153,7 @@ public abstract class CompositeRepository<TEntity, TKey1, TKey2>(
         return entityList;
     }
 
-    protected async Task<IReadOnlyList<TEntity>> UpdateRangeAsync(
+    protected virtual async Task<IReadOnlyList<TEntity>> UpdateRangeAsync(
         Action<TEntity> updateAction,
         params (TKey1, TKey2)[] keys
     )
@@ -178,7 +191,7 @@ public abstract class CompositeRepository<TEntity, TKey1, TKey2>(
     /// <summary>
     /// Delete an entity from the database.
     /// </summary>
-    protected async Task<TEntity> DeleteAsync(TEntity entity)
+    protected virtual async Task<TEntity> DeleteAsync(TEntity entity)
     {
         if (entity == null)
         {
@@ -209,7 +222,7 @@ public abstract class CompositeRepository<TEntity, TKey1, TKey2>(
     /// <summary>
     /// Delete an entity from the database by its composite key.
     /// </summary>
-    protected async Task<TEntity> DeleteAsync(TKey1 key1, TKey2 key2)
+    protected virtual async Task<TEntity> DeleteAsync(TKey1 key1, TKey2 key2)
     {
         TEntity entity = await GetTrackedEntityOrThrowAsync(key1, key2);
 
@@ -221,7 +234,7 @@ public abstract class CompositeRepository<TEntity, TKey1, TKey2>(
     /// <summary>
     /// Delete multiple entities from the database.
     /// </summary>
-    protected async Task<IReadOnlyList<TEntity>> DeleteRangeAsync(params TEntity[] entities)
+    protected virtual async Task<IReadOnlyList<TEntity>> DeleteRangeAsync(params TEntity[] entities)
     {
         if (entities == null || entities.Length == 0)
         {
@@ -254,7 +267,11 @@ public abstract class CompositeRepository<TEntity, TKey1, TKey2>(
     ///
     /// Used as an early check to avoid unnecessary database queries.
     /// </summary>
-    protected async Task<TEntity> GetTrackedEntityOrThrowAsync(TKey1 key1, TKey2 key2)
+    /// <remarks>
+    /// Note that since EF Core can't track the generic key1/key2 methods, it is
+    /// necessary to directly query with the composite keys in any implentation predicates.
+    /// </remarks>
+    protected virtual async Task<TEntity> GetTrackedEntityOrThrowAsync(TKey1 key1, TKey2 key2)
     {
         // first check if entity is already tracked by the context
         EntityEntry<TEntity>? trackedEntry = _context
@@ -267,10 +284,7 @@ public abstract class CompositeRepository<TEntity, TKey1, TKey2>(
         }
 
         // if not tracked, query the database directly with tracking enabled
-        TEntity? entity = await GetAsync(
-            (key1, key2).CreateEqualityPredicate<TEntity, TKey1, TKey2>(),
-            tracking: true
-        );
+        TEntity? entity = await GetAsync(key1, key2, tracking: true);
 
         if (entity == null)
         {
@@ -360,9 +374,16 @@ public abstract class CompositeRepository<TEntity, TKey1, TKey2>(
         }
 
         // query database for missing entities in a single batch
-        List<TEntity> missingEntities = await _dbSet
-            .Where(e => missingKeys.Any(k => e.Key1.Equals(k.Item1) && e.Key2.Equals(k.Item2)))
-            .ToListAsync();
+        // Use concrete implementations to avoid LINQ translation issues
+        List<TEntity> missingEntities = [];
+        foreach (var (key1, key2) in missingKeys)
+        {
+            TEntity? entity = await GetAsync(key1, key2, tracking: false);
+            if (entity != null)
+            {
+                missingEntities.Add(entity);
+            }
+        }
 
         // Verify we found all missing entities
         HashSet<(TKey1, TKey2)> foundKeys = [.. missingEntities.Select(e => (e.Key1, e.Key2))];
