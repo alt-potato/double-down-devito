@@ -2,19 +2,17 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
-using Project.Api.Models.Games; // Add this using directive for IRoomEventData and concrete types
+using Project.Api.Models.Games;
 using Project.Api.Services;
+using Project.Api.Utilities.Constants;
 using Project.Api.Utilities.Enums;
-using Project.Api.Utilities.Extensions; // Add this using directive for RoomEventType
+using Project.Api.Utilities.Extensions;
 
 namespace Project.Test.Services;
 
 public class RoomSSEServiceTests
 {
-    private readonly JsonSerializerOptions _jsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase, // use js convention instead of C#
-    };
+    private readonly JsonSerializerOptions _jsonOptions = ApiJsonSerializerOptions.DefaultOptions;
 
     /// <summary>
     /// Creates a mock HttpContext for testing SSE connections.
