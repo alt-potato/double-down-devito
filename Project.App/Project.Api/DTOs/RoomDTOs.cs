@@ -22,7 +22,7 @@ public class CreateRoomDTO
 {
     public Guid HostId { get; set; }
     public bool IsPublic { get; set; } = true;
-    public string GameMode { get; set; } = string.Empty;
+    public string? GameMode { get; set; }
     public string GameConfig { get; set; } = string.Empty;
     public string? Description { get; set; }
     public int MaxPlayers { get; set; } = 10;
@@ -45,8 +45,6 @@ public class CreateRoomDtoValidator : AbstractValidator<CreateRoomDTO>
         RuleFor(x => x.MaxPlayers)
             .GreaterThanOrEqualTo(x => x.MinPlayers)
             .WithMessage("Maximum players must be greater than or equal to the minimum players.");
-
-        RuleFor(x => x.GameMode).NotEmpty().WithMessage("Game mode is required.");
 
         RuleFor(x => x.Description)
             .MaximumLength(500)

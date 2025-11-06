@@ -1,6 +1,5 @@
 using System.Text.Json;
 using AutoMapper;
-using Project.Api.Data;
 using Project.Api.DTOs;
 using Project.Api.Models;
 using Project.Api.Models.Games;
@@ -12,23 +11,21 @@ using Project.Api.Utilities.Constants;
 namespace Project.Api.Services;
 
 public class RoomService(
-    IRoomRepository roomRepository,
-    IRoomPlayerRepository roomPlayerRepository,
-    AppDbContext dbContext,
+    IUnitOfWork unitOfWork,
     IEnumerable<IGameService<IGameState, GameConfig>> gameServices,
     IMapper mapper,
     ILogger<RoomService> logger
 ) : IRoomService
 {
-    private readonly IRoomRepository _roomRepository = roomRepository;
-    private readonly IRoomPlayerRepository _roomPlayerRepository = roomPlayerRepository;
-    private readonly AppDbContext _dbContext = dbContext;
+    private readonly IUnitOfWork _uow = unitOfWork;
     private readonly Dictionary<string, IGameService<IGameState, GameConfig>> _gameServices =
-        gameServices.ToDictionary(s => s.GameMode.ToLowerInvariant(), s => s); // Initialize dictionary
+        gameServices.ToDictionary(s => s.GameMode.ToLowerInvariant(), s => s); // initialize dictionary
     private readonly IMapper _mapper = mapper;
     private readonly ILogger<RoomService> _logger = logger;
 
-    // Helper method to get the correct game service
+    /// <summary>
+    /// Helper method to get the correct game service.
+    /// </summary>
     private IGameService<IGameState, GameConfig> GetGameService(string gameMode)
     {
         if (!_gameServices.TryGetValue(gameMode.ToLowerInvariant(), out var service))
@@ -40,31 +37,31 @@ public class RoomService(
 
     public async Task<RoomDTO?> GetRoomByIdAsync(Guid id)
     {
-        var room = await _roomRepository.GetByIdAsync(id);
+        var room = await _uow.Rooms.GetByIdAsync(id);
         return room is null ? null : _mapper.Map<RoomDTO>(room);
     }
 
-    public async Task<IEnumerable<RoomDTO>> GetAllRoomsAsync()
+    public async Task<IReadOnlyList<RoomDTO>> GetAllRoomsAsync()
     {
-        var rooms = await _roomRepository.GetAllAsync();
-        return _mapper.Map<IEnumerable<RoomDTO>>(rooms);
+        var rooms = await _uow.Rooms.GetAllAsync();
+        return _mapper.Map<IReadOnlyList<RoomDTO>>(rooms);
     }
 
-    public async Task<IEnumerable<RoomDTO>> GetActiveRoomsAsync()
+    public async Task<IReadOnlyList<RoomDTO>> GetActiveRoomsAsync()
     {
-        var rooms = await _roomRepository.GetActiveRoomsAsync();
-        return _mapper.Map<IEnumerable<RoomDTO>>(rooms);
+        var rooms = await _uow.Rooms.GetAllActiveAsync();
+        return _mapper.Map<IReadOnlyList<RoomDTO>>(rooms);
     }
 
-    public async Task<IEnumerable<RoomDTO>> GetPublicRoomsAsync()
+    public async Task<IReadOnlyList<RoomDTO>> GetPublicRoomsAsync()
     {
-        var rooms = await _roomRepository.GetPublicRoomsAsync();
-        return _mapper.Map<IEnumerable<RoomDTO>>(rooms);
+        var rooms = await _uow.Rooms.GetAllPublicAsync();
+        return _mapper.Map<IReadOnlyList<RoomDTO>>(rooms);
     }
 
     public async Task<RoomDTO?> GetRoomByHostIdAsync(Guid hostId)
     {
-        var room = await _roomRepository.GetByHostIdAsync(hostId);
+        var room = await _uow.Rooms.GetByHostIdAsync(hostId);
         return room is null ? null : _mapper.Map<RoomDTO>(room);
     }
 
@@ -76,109 +73,221 @@ public class RoomService(
 
         room.Id = Guid.CreateVersion7();
         room.CreatedAt = DateTimeOffset.UtcNow;
-        room.DeckId = string.Empty;
         room.IsActive = true;
 
-        // Get the game service for the room's game mode
-        var gameService = GetGameService(room.GameMode);
+        Room createdRoom = await _uow.Rooms.CreateAsync(room); // create room
 
-        // Initialize proper game state using the game service
-        room.GameState = gameService.GetInitialStateAsync();
-
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
-        try
+        // if a game mode is specified, create a game and associate it with the room
+        if (!string.IsNullOrWhiteSpace(dto.GameMode))
         {
-            Room createdRoom = await _roomRepository.CreateAsync(room); // create room
+            var gameService = GetGameService(dto.GameMode);
 
-            // Delegate host player creation to the game service
+            // create game entity
+            Game game = new()
+            {
+                GameMode = dto.GameMode,
+                GameState = gameService.GetInitialStateAsync(),
+                GameConfig = dto.GameConfig,
+                CreatedAt = DateTimeOffset.UtcNow,
+            };
+
+            await _uow.Games.CreateAsync(game);
+
+            // associate the game with the room
+            createdRoom.GameId = game.Id;
+            await _uow.Rooms.UpdateAsync(createdRoom);
+
+            // delegate host player creation to the game service
             await gameService.PlayerJoinAsync(createdRoom.Id, dto.HostId);
-
-            await transaction.CommitAsync();
-
-            _logger.LogInformation("Successfully created room with ID: {RoomId}", createdRoom.Id);
-            return _mapper.Map<RoomDTO>(createdRoom);
         }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Failed to create room for host {HostId}", dto.HostId);
-            throw;
-        }
+
+        _logger.LogInformation("Successfully created room with ID: {RoomId}", createdRoom.Id);
+        return _mapper.Map<RoomDTO>(createdRoom);
     }
 
     public async Task<RoomDTO?> UpdateRoomAsync(UpdateRoomDTO dto)
     {
-        var existingRoom = await _roomRepository.GetByIdAsync(dto.Id);
+        var existingRoom = await _uow.Rooms.GetByIdAsync(dto.Id);
         if (existingRoom is null)
             return null;
 
         _mapper.Map(dto, existingRoom);
 
-        var updatedRoom = await _roomRepository.UpdateAsync(existingRoom);
+        var updatedRoom = await _uow.Rooms.UpdateAsync(existingRoom);
         return updatedRoom is null ? null : _mapper.Map<RoomDTO>(updatedRoom);
     }
 
     public async Task<bool> DeleteRoomAsync(Guid id)
     {
-        return await _roomRepository.DeleteAsync(id);
+        var deletedRoom = await _uow.Rooms.DeleteAsync(id);
+        return deletedRoom != null;
     }
 
     public async Task<bool> RoomExistsAsync(Guid id)
     {
-        return await _roomRepository.ExistsAsync(id);
+        return await _uow.Rooms.ExistsAsync(id);
     }
 
-    public async Task<string> GetGameStateAsync(Guid id)
+    public async Task<string> GetGameStateAsync(Guid roomId)
     {
-        return await _roomRepository.GetGameStateAsync(id);
+        var room = await _uow.Rooms.GetByIdAsync(roomId);
+        if (room?.GameId == null)
+        {
+            return string.Empty;
+        }
+
+        var game = await _uow.Games.GetByIdAsync(room.GameId.Value);
+        return game?.GameState ?? string.Empty;
     }
 
-    public async Task<bool> UpdateGameStateAsync(Guid id, string gameState)
+    public async Task<bool> UpdateGameStateAsync(Guid roomId, string gameState)
     {
         if (string.IsNullOrWhiteSpace(gameState))
             throw new BadRequestException("Game state cannot be empty.");
 
-        _logger.LogInformation("Updating game state for room {RoomId}", id);
-        return await _roomRepository.UpdateGameStateAsync(id, gameState);
+        _logger.LogInformation("Updating game state for room {RoomId}", roomId);
+
+        var room = await _uow.Rooms.GetByIdAsync(roomId);
+        if (room?.GameId == null)
+        {
+            throw new BadRequestException("Room does not have an associated game.");
+        }
+
+        var updatedGame = await _uow.Games.UpdateGamestateAsync(room.GameId.Value, gameState);
+        return updatedGame != null;
     }
 
-    public async Task<string> GetGameConfigAsync(Guid id)
+    public async Task<string> GetGameConfigAsync(Guid roomId)
     {
-        _logger.LogInformation("Getting game config for room {RoomId}", id);
-        return await _roomRepository.GetGameConfigAsync(id);
+        _logger.LogInformation("Getting game config for room {RoomId}", roomId);
+
+        var room = await _uow.Rooms.GetByIdAsync(roomId);
+        if (room?.GameId == null)
+        {
+            return string.Empty;
+        }
+
+        var game = await _uow.Games.GetByIdAsync(room.GameId.Value);
+        return game?.GameConfig ?? string.Empty;
     }
 
-    public async Task<bool> UpdateGameConfigAsync(Guid id, string gameConfig)
+    public async Task<bool> UpdateGameConfigAsync(Guid roomId, string gameConfig)
     {
         if (string.IsNullOrWhiteSpace(gameConfig))
             throw new BadRequestException("Game config cannot be empty.");
 
-        _logger.LogInformation("Updating game config for room {RoomId}", id);
-        return await _roomRepository.UpdateGameConfigAsync(id, gameConfig);
+        _logger.LogInformation("Updating game config for room {RoomId}", roomId);
+
+        var room = await _uow.Rooms.GetByIdAsync(roomId);
+        if (room?.GameId == null)
+        {
+            throw new BadRequestException("Room does not have an associated game.");
+        }
+
+        var game = await _uow.Games.GetByIdAsync(room.GameId.Value);
+        if (game == null)
+            return false;
+
+        game.GameConfig = gameConfig;
+        var updatedGame = await _uow.Games.UpdateAsync(game);
+        return updatedGame != null;
+    }
+
+    // --- game association methods ---
+
+    /// <summary>
+    /// Sets or updates the game for a room. If the room already has a game, it will be replaced.
+    /// </summary>
+    public async Task<RoomDTO> SetRoomGameAsync(
+        Guid roomId,
+        string gameMode,
+        string? gameConfig = null
+    )
+    {
+        _logger.LogDebug("Setting game for room {RoomId} to mode {GameMode}", roomId, gameMode);
+
+        var room =
+            await _uow.Rooms.GetByIdAsync(roomId)
+            ?? throw new NotFoundException($"Room with ID {roomId} not found.");
+
+        var gameService = GetGameService(gameMode);
+
+        // If room already has a game, delete it first
+        if (room.GameId != null)
+        {
+            await _uow.Games.DeleteAsync(room.GameId.Value);
+        }
+
+        // Create new game entity
+        Game game = new()
+        {
+            GameMode = gameMode,
+            GameState = gameService.GetInitialStateAsync(),
+            GameConfig = gameConfig ?? string.Empty,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        await _uow.Games.CreateAsync(game);
+
+        // Associate the game with the room
+        room.GameId = game.Id;
+        var updatedRoom = await _uow.Rooms.UpdateAsync(room);
+
+        // await transaction.CommitAsync();
+
+        _logger.LogInformation("Successfully set game for room {RoomId}", roomId);
+        return _mapper.Map<RoomDTO>(updatedRoom);
+    }
+
+    /// <summary>
+    /// Removes the game association from a room.
+    /// </summary>
+    public async Task<RoomDTO> RemoveGameFromRoomAsync(Guid roomId)
+    {
+        _logger.LogDebug("Removing game association from room {RoomId}", roomId);
+
+        var room =
+            await _uow.Rooms.GetByIdAsync(roomId)
+            ?? throw new NotFoundException($"Room with ID {roomId} not found.");
+
+        if (room.GameId == null)
+        {
+            throw new BadRequestException("Room does not have an associated game.");
+        }
+
+        // Delete the game
+        await _uow.Games.DeleteAsync(room.GameId.Value);
+
+        // Remove game association from room
+        room.GameId = null;
+        var updatedRoom = await _uow.Rooms.UpdateAsync(room);
+
+        _logger.LogInformation("Successfully removed game association from room {RoomId}", roomId);
+        return _mapper.Map<RoomDTO>(updatedRoom);
     }
 
     // --- game functionality ---
 
     public async Task<RoomDTO> StartGameAsync(Guid roomId, string? gameConfigJson = null)
     {
-        _logger.LogInformation("Starting game for room {RoomId}", roomId);
+        _logger.LogDebug("Starting game for room {RoomId}...", roomId);
 
-        // Get the room
-        var room =
-            await _roomRepository.GetByIdAsync(roomId)
+        // get the room
+        Room room =
+            await _uow.Rooms.GetByIdAsync(roomId)
             ?? throw new NotFoundException($"Room with ID {roomId} not found.");
 
-        // Validate room is not already started
+        // validate room is not already started
         if (room.StartedAt != null)
         {
             _logger.LogWarning("Attempted to start already-started game in room {RoomId}", roomId);
             throw new BadRequestException("Game has already been started.");
         }
 
-        // Get player count
-        int playerCount = await _roomPlayerRepository.GetPlayerCountInRoomAsync(roomId);
+        // get player count
+        int playerCount = await _uow.RoomPlayers.GetPlayerCountAsync(roomId);
 
-        // Validate minimum players
+        // validate minimum players
         if (playerCount < room.MinPlayers)
         {
             _logger.LogWarning(
@@ -192,14 +301,25 @@ public class RoomService(
             );
         }
 
+        // get game associated with the room
+        if (room.GameId == null)
+        {
+            throw new BadRequestException("Room does not have an associated game.");
+        }
+
+        var game =
+            await _uow.Games.GetByIdAsync(room.GameId.Value)
+            ?? throw new NotFoundException($"Game with ID {room.GameId} not found.");
+
         // get game service
-        var gameService = GetGameService(room.GameMode);
+
+        var gameService = GetGameService(game.GameMode);
 
         // determine config based on game mode using a switch statement
         GameConfig config;
         try
         {
-            switch (room.GameMode.ToLowerInvariant())
+            switch (game.GameMode.ToLowerInvariant())
             {
                 case GameModes.Blackjack:
                     if (!string.IsNullOrWhiteSpace(gameConfigJson))
@@ -215,11 +335,11 @@ public class RoomService(
                             roomId
                         );
                     }
-                    else if (!string.IsNullOrWhiteSpace(room.GameConfig))
+                    else if (!string.IsNullOrWhiteSpace(game.GameConfig))
                     {
-                        // Use existing config for Blackjack
+                        // use existing config for Blackjack
                         config =
-                            JsonSerializer.Deserialize<BlackjackConfig>(room.GameConfig)
+                            JsonSerializer.Deserialize<BlackjackConfig>(game.GameConfig)
                             ?? throw new BadRequestException(
                                 "Invalid existing Blackjack game configuration."
                             );
@@ -230,7 +350,7 @@ public class RoomService(
                     }
                     else
                     {
-                        // Use default Blackjack config
+                        // use default Blackjack config
                         config = new BlackjackConfig();
                         _logger.LogInformation(
                             "Using default Blackjack config for room {RoomId}",
@@ -238,15 +358,12 @@ public class RoomService(
                         );
                     }
                     break;
-                // Add cases for other game modes here if they have specific GameConfig types
-                // case GameModes.Poker:
-                //     // ... handle PokerConfig ...
-                //     break;
+                // this is where i would add more game modes
+                // ...if i had them
                 default:
-                    // Fallback for unsupported game modes or if a specific config type isn't handled
-                    // This should ideally be caught by GetGameService, but as a safeguard:
+                    // should be caught by gameServices, but just in case
                     throw new BadRequestException(
-                        $"Unsupported game mode for configuration: {room.GameMode}"
+                        $"Unsupported game mode for configuration: {game.GameMode}"
                     );
             }
         }
@@ -263,9 +380,9 @@ public class RoomService(
         // start the game!
         await gameService.StartGameAsync(roomId, config); // delegate setup to the generic game service
 
-        _logger.LogInformation("Successfully started game for room {RoomId}", roomId);
+        _logger.LogInformation("Successfully started game for room {RoomId}!", roomId);
         return _mapper.Map<RoomDTO>(
-            await _roomRepository.GetByIdAsync(roomId)
+            await _uow.Rooms.GetByIdAsync(roomId)
                 ?? throw new NotFoundException($"Room with ID {roomId} not found.")
         );
     }
@@ -277,19 +394,19 @@ public class RoomService(
         JsonElement data
     )
     {
-        _logger.LogInformation(
+        _logger.LogDebug(
             "Player {PlayerId} performing action '{Action}' in room {RoomId}",
             playerId,
             action,
             roomId
         );
 
-        // Validate room exists
-        var room =
-            await _roomRepository.GetByIdAsync(roomId)
+        // validate room exists
+        Room room =
+            await _uow.Rooms.GetByIdAsync(roomId)
             ?? throw new NotFoundException($"Room with ID {roomId} not found.");
 
-        // Validate game has started
+        // validate game has started
         if (room.StartedAt == null)
         {
             _logger.LogWarning(
@@ -300,8 +417,8 @@ public class RoomService(
             throw new BadRequestException("Game has not been started yet.");
         }
 
-        // Validate player is in the room
-        bool isPlayerInRoom = await _roomPlayerRepository.IsPlayerInRoomAsync(roomId, playerId);
+        // validate player is in the room
+        bool isPlayerInRoom = await _uow.RoomPlayers.RoomHasPlayerAsync(roomId, playerId);
         if (!isPlayerInRoom)
         {
             _logger.LogWarning(
@@ -312,8 +429,18 @@ public class RoomService(
             throw new BadRequestException($"Player {playerId} is not in room {roomId}.");
         }
 
-        // Delegate to the appropriate game service based on game mode
-        var gameService = GetGameService(room.GameMode);
+        // get the game associated with the room
+        if (room.GameId == null)
+        {
+            throw new BadRequestException("Room does not have an associated game.");
+        }
+
+        Game game =
+            await _uow.Games.GetByIdAsync(room.GameId.Value)
+            ?? throw new NotFoundException($"Game with ID {room.GameId} not found.");
+
+        // delegate to the appropriate game service based on game mode
+        var gameService = GetGameService(game.GameMode);
         await gameService.PerformActionAsync(roomId, playerId, action, data);
         _logger.LogInformation(
             "Successfully performed action '{Action}' for player {PlayerId} in room {RoomId}",
@@ -327,48 +454,78 @@ public class RoomService(
 
     public async Task<RoomDTO> JoinRoomAsync(Guid roomId, Guid userId)
     {
-        _logger.LogInformation("User {UserId} attempting to join room {RoomId}", userId, roomId);
+        _logger.LogDebug("User {UserId} attempting to join room {RoomId}...", userId, roomId);
 
-        // Validate room exists
-        var room =
-            await _roomRepository.GetByIdAsync(roomId)
+        // validate room exists
+        Room room =
+            await _uow.Rooms.GetByIdAsync(roomId)
             ?? throw new NotFoundException($"Room with ID {roomId} not found.");
 
-        // Validate room is active
+        // validate room is active
         if (!room.IsActive)
         {
             _logger.LogWarning(
-                "User {UserId} attempted to join inactive room {RoomId}",
+                "User {UserId} attempted to join inactive room {RoomId}.",
                 userId,
                 roomId
             );
             throw new BadRequestException("Room is not active.");
         }
 
-        // delegate to the appropriate game service
-        // should include setting up the player, adding them to the room, etc.
-        var gameService = GetGameService(room.GameMode);
-        await gameService.PlayerJoinAsync(roomId, userId);
+        // add user to room
+        if (!await _uow.RoomPlayers.RoomHasPlayerAsync(roomId, userId))
+        {
+            await _uow.RoomPlayers.AddAsync(roomId, userId);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "User {UserId} attempted to join room {RoomId} they are already in.",
+                userId,
+                roomId
+            );
+            throw new BadRequestException("User is already in the room.");
+        }
 
-        // Return the room (no need to fetch again, we have it)
+        // if room has a game, also add player to game (delegated to the appropriate game service)
+        if (room.GameId != null)
+        {
+            var game =
+                await _uow.Games.GetByIdAsync(room.GameId.Value)
+                ?? throw new NotFoundException($"Game with ID {room.GameId} not found.");
+
+            var gameService = GetGameService(game.GameMode);
+            await gameService.PlayerJoinAsync(roomId, userId);
+        }
+
+        // return the room (we already have it)
         return _mapper.Map<RoomDTO>(room);
     }
 
     public async Task<RoomDTO> LeaveRoomAsync(Guid roomId, Guid userId)
     {
-        _logger.LogInformation("User {UserId} attempting to leave room {RoomId}", userId, roomId);
+        _logger.LogDebug("User {UserId} attempting to leave room {RoomId}...", userId, roomId);
 
-        // Validate room exists
+        // validate room exists
         var room =
-            await _roomRepository.GetByIdAsync(roomId)
+            await _uow.Rooms.GetByIdAsync(roomId)
             ?? throw new NotFoundException($"Room with ID {roomId} not found.");
 
-        // delegate to the appropriate game service
-        // should include removing the player from the room, selecting new host if necessary, etc.
-        var gameService = GetGameService(room.GameMode);
-        await gameService.PlayerLeaveAsync(roomId, userId);
+        // remove player from roomplayers
+        await _uow.RoomPlayers.DeleteAsync(roomId, userId);
 
-        // Return the room (we already have it)
+        // if room has a game, also remove player from game (delegated to the appropriate game service)
+        if (room.GameId != null)
+        {
+            var game =
+                await _uow.Games.GetByIdAsync(room.GameId.Value)
+                ?? throw new NotFoundException($"Game with ID {room.GameId} not found.");
+
+            var gameService = GetGameService(game.GameMode);
+            await gameService.PlayerLeaveAsync(roomId, userId);
+        }
+
+        // return the room (we already have it)
         return _mapper.Map<RoomDTO>(room);
     }
 }

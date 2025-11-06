@@ -6,9 +6,9 @@ namespace Project.Api.Services.Interface;
 public interface IRoomService
 {
     Task<RoomDTO?> GetRoomByIdAsync(Guid id);
-    Task<IEnumerable<RoomDTO>> GetAllRoomsAsync();
-    Task<IEnumerable<RoomDTO>> GetActiveRoomsAsync();
-    Task<IEnumerable<RoomDTO>> GetPublicRoomsAsync();
+    Task<IReadOnlyList<RoomDTO>> GetAllRoomsAsync();
+    Task<IReadOnlyList<RoomDTO>> GetActiveRoomsAsync();
+    Task<IReadOnlyList<RoomDTO>> GetPublicRoomsAsync();
     Task<RoomDTO?> GetRoomByHostIdAsync(Guid hostId);
     Task<RoomDTO> CreateRoomAsync(CreateRoomDTO dto);
     Task<RoomDTO?> UpdateRoomAsync(UpdateRoomDTO dto);

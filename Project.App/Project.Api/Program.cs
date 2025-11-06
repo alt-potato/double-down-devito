@@ -175,6 +175,7 @@ public static class ProgramExtensions
         services.AddSingleton<IRoomSSEService, RoomSSEService>();
 
         // repository services
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IHandRepository, HandRepository>();
         services.AddScoped<IRoomPlayerRepository, RoomPlayerRepository>();
         services.AddScoped<IRoomRepository, RoomRepository>();
