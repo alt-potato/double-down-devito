@@ -1,191 +1,180 @@
+using AutoMapper;
+using Project.Api.DTOs;
 using Project.Api.Models;
 using Project.Api.Repositories.Interface;
 using Project.Api.Services.Interface;
+using Project.Api.Utilities;
+using Project.Api.Utilities.Extensions;
 
 namespace Project.Api.Services
 {
-    public class UserService : IUserService
+    public class UserService(IUnitOfWork unitOfWork, IMapper mapper, ILogger<UserService> logger)
+        : IUserService
     {
-        private readonly IUserRepository _repo;
-        private readonly ILogger<UserService> _logger;
+        private readonly IUnitOfWork _uow = unitOfWork;
+        private readonly IMapper _mapper = mapper;
+        private readonly ILogger<UserService> _logger = logger;
 
-        public UserService(IUserRepository repo, ILogger<UserService> logger)
+        public async Task<IReadOnlyList<UserDTO>> GetAllUsersAsync()
         {
-            _repo = repo;
-            _logger = logger;
+            _logger.LogDebug("Getting all users...");
+
+            IReadOnlyList<User> users = await _uow.Users.GetAllAsync();
+            return _mapper.Map<IReadOnlyList<UserDTO>>(users);
         }
 
-        public async Task<IEnumerable<User>> GetAllUsersAsync()
+        public async Task<UserDTO?> GetUserByIdAsync(Guid userId)
         {
-            try
+            _logger.LogDebug("Getting user {userId}...", userId);
+
+            User? user = await _uow.Users.GetByIdAsync(userId);
+
+            if (user == null)
             {
-                _logger.LogInformation("Getting all users");
-                return await _repo.GetAllAsync();
+                _logger.LogInformation("User {userId} not found.", userId);
+                return null;
             }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Error getting all users: {e.Message}", e.Message);
-                throw new Exception(e.Message);
-            }
+
+            return _mapper.Map<UserDTO>(user);
         }
 
-        public async Task<User?> GetUserByIdAsync(Guid userId)
+        public async Task<UserDTO?> GetUserByEmailAsync(string email)
         {
-            try
+            _logger.LogDebug("Getting user by email {email}...", email);
+
+            User? user = await _uow.Users.GetByEmailAsync(email);
+
+            if (user == null)
             {
-                _logger.LogInformation("Getting user {userId}", userId);
-                return await _repo.GetByIdAsync(userId);
+                _logger.LogInformation("User with email {email} not found.", email);
+                return null;
             }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Error getting user {userId}: {e.Message}", userId, e.Message);
-                throw new Exception(e.Message);
-            }
+
+            return _mapper.Map<UserDTO>(user);
         }
 
-        public async Task<User?> GetUserByEmailAsync(string email)
+        public async Task<UserDTO> CreateUserAsync(CreateUserDTO dto)
         {
-            try
-            {
-                _logger.LogInformation("Getting user by email {email}", email);
-                return await _repo.GetByEmailAsync(email);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(
-                    e,
-                    "Error getting user by email {email}: {e.Message}",
-                    email,
-                    e.Message
+            _logger.LogDebug("Creating a new user...");
+
+            User user = _mapper.Map<User>(dto);
+            user.Id = Guid.CreateVersion7();
+            // timestamps set automatically
+
+            User createdUser =
+                await _uow.Users.CreateAsync(user)
+                ?? _logger.LogAndThrow<User>(
+                    new InternalServerException("Unable to create user."),
+                    $"Unable to create user with data {dto}."
                 );
-                throw new Exception(e.Message);
-            }
+
+            _logger.LogInformation("User {userId} created!", createdUser.Id);
+            return _mapper.Map<UserDTO>(createdUser);
         }
 
-        public async Task<User> CreateUserAsync(User user)
+        public async Task<UserDTO> UpdateUserAsync(Guid userId, UpdateUserDTO user)
         {
-            _logger.LogInformation("Creating a new user");
-            await _repo.AddAsync(user);
-            return user;
-        }
+            _logger.LogDebug("Updating user {userId}...", userId);
 
-        public async Task<User> UpdateUserAsync(Guid userId, User user)
-        {
-            try
-            {
-                _logger.LogInformation("Updating user {userId}", userId);
-                user.Id = userId;
-                await _repo.UpdateAsync(user);
-                return user;
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Error updating user {userId}: {e.Message}", userId, e.Message);
-                throw new Exception(e.Message);
-            }
+            User userToUpdate =
+                await _uow.Users.GetByIdAsync(userId)
+                ?? _logger.LogAndThrow<User>(
+                    new NotFoundException($"User with ID {userId} not found.")
+                );
+
+            _mapper.Map(user, userToUpdate);
+
+            User updatedUser =
+                await _uow.Users.UpdateAsync(userToUpdate)
+                ?? _logger.LogAndThrow<User>(
+                    new InternalServerException("Unable to update user."),
+                    $"Unable to update user with data {user}."
+                );
+
+            return _mapper.Map<UserDTO>(updatedUser);
         }
 
         public async Task<bool> DeleteUserAsync(Guid userId)
         {
-            try
+            _logger.LogDebug("Deleting user {userId}", userId);
+
+            bool success = await _uow.Users.DeleteAsync(userId) != null;
+
+            if (!success)
             {
-                _logger.LogInformation("Deleting user {userId}", userId);
-                await _repo.DeleteAsync(userId);
-                return true;
+                _logger.LogWarning("User {userId} not found", userId);
+                throw new NotFoundException($"User with ID {userId} not found.");
             }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Error deleting user {userId}: {e.Message}", userId, e.Message);
-                throw new Exception(e.Message);
-            }
+
+            return success;
         }
 
-        public async Task<User> UpdateUserBalanceAsync(Guid userId, double newBalance)
+        public async Task<UserDTO> UpdateUserBalanceAsync(Guid userId, double newBalance)
         {
-            try
-            {
-                _logger.LogInformation(
-                    "Updating balance for user {userId} to {newBalance}",
-                    userId,
-                    newBalance
-                );
-                var user = await GetUserByIdAsync(userId);
+            _logger.LogDebug(
+                "Updating balance for user {userId} to {newBalance}...",
+                userId,
+                newBalance
+            );
 
-                if (user == null)
-                {
-                    throw new KeyNotFoundException($"User {userId} not found");
-                }
-
-                user.Balance = newBalance;
-                await _repo.UpdateBalanceAsync(user);
-                return user;
-            }
-            catch (Exception e)
+            // enforce balance > 0
+            if (newBalance <= 0)
             {
-                _logger.LogError(
-                    e,
-                    "Error updating balance for user {userId}: {e.Message}",
-                    userId,
-                    e.Message
-                );
-                throw new Exception(e.Message);
+                _logger.LogWarning("Balance must be greater than 0.");
+                throw new BadRequestException("Balance must be greater than 0.");
             }
+
+            // throws NotFoundException if user not found
+            User user = await _uow.Users.UpdateBalanceAsync(userId, newBalance);
+
+            return _mapper.Map<UserDTO>(user);
         }
 
-        public async Task<User> UpsertGoogleUserByEmailAsync(
+        public async Task<UserDTO> UpsertGoogleUserByEmailAsync(
             string email,
             string? name,
             string? avatarUrl
         )
         {
-            try
-            {
-                _logger.LogInformation("Upserting Google user by email {Email}", email);
+            _logger.LogDebug("Upserting Google user by email {Email}", email);
 
-                var user = await _repo.GetByEmailAsync(email);
-                if (user == null)
+            User? user = await _uow.Users.GetByEmailAsync(email);
+            if (user == null)
+            {
+                // if user does not exist, create a new one
+
+                user = new User
                 {
-                    user = new User //dont have user DTO yet but this can be replaced by one
-                    {
-                        Id = Guid.NewGuid(),
-                        Email = email,
-                        Name = string.IsNullOrWhiteSpace(name) ? email : name!,
-                        AvatarUrl = avatarUrl,
-                    };
+                    Id = Guid.CreateVersion7(),
+                    Email = email,
+                    Name = string.IsNullOrWhiteSpace(name) ? email : name!,
+                    AvatarUrl = avatarUrl,
+                };
 
-                    _logger.LogInformation(
-                        "UpsertGoogleUserByEmailAsync called for {Email}",
-                        email
-                    );
+                User newUser = await _uow.Users.CreateAsync(user);
 
-                    await _repo.AddAsync(user);
-                    return user;
-                }
-
-                // Update lightweight profile fields
-                if (!string.IsNullOrWhiteSpace(name) && !name.Equals(user.Name))
-                    user.Name = name!;
-                if (!string.IsNullOrWhiteSpace(avatarUrl))
-                    user.AvatarUrl = avatarUrl;
-
-                await _repo.UpdateAsync(user);
-                return user;
+                _logger.LogInformation("New user {userId} created through Google!", newUser.Id);
+                return _mapper.Map<UserDTO>(newUser);
             }
-            catch (Exception e)
-            {
-                _logger.LogError(
-                    e,
-                    "Error upserting Google user by email {Email}: {Message}",
-                    email,
-                    e.Message
-                );
-                throw;
-            }
+
+            // update lightweight profile fields
+            if (!string.IsNullOrWhiteSpace(name) && !name.Equals(user.Name))
+                user.Name = name!;
+            if (!string.IsNullOrWhiteSpace(avatarUrl))
+                user.AvatarUrl = avatarUrl;
+
+            User updatedUser = await _uow.Users.UpdateAsync(user);
+
+            _logger.LogInformation("User {userId} updated through Google!", user.Id);
+
+            return _mapper.Map<UserDTO>(updatedUser);
         }
 
-        public async Task<User?> GetByEmailAsync(string email)
+        public async Task<UserDTO?> GetByEmailAsync(string email)
         {
-            return await _repo.GetByEmailAsync(email);
+            _logger.LogDebug("Getting user by email {email}...", email);
+
+            return _mapper.Map<UserDTO>(await _uow.Users.GetByEmailAsync(email));
         }
     }
 }

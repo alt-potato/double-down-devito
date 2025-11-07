@@ -1,25 +1,24 @@
+using Project.Api.DTOs;
 using Project.Api.Models;
 
 namespace Project.Api.Services.Interface
 {
     public interface IUserService
     {
-        Task<IEnumerable<User>> GetAllUsersAsync();
+        Task<IReadOnlyList<UserDTO>> GetAllUsersAsync();
 
-        Task<User?> GetUserByIdAsync(Guid userId);
+        Task<UserDTO?> GetUserByIdAsync(Guid userId);
 
-        Task<User?> GetUserByEmailAsync(string email);
+        Task<UserDTO?> GetUserByEmailAsync(string email);
 
-        Task<User> CreateUserAsync(User user);
+        Task<UserDTO> CreateUserAsync(CreateUserDTO user);
 
-        Task<User> UpdateUserAsync(Guid userId, User user);
+        Task<UserDTO> UpdateUserAsync(Guid userId, UpdateUserDTO user);
 
         Task<bool> DeleteUserAsync(Guid userId);
 
-        Task<User> UpdateUserBalanceAsync(Guid userId, double newBalance);
+        Task<UserDTO> UpdateUserBalanceAsync(Guid userId, double balance);
 
-        Task<User> UpsertGoogleUserByEmailAsync(string email, string? name, string? avatarUrl); //update + insert new google login to our db
-
-        Task<User?> GetByEmailAsync(string email);
+        Task<UserDTO> UpsertGoogleUserByEmailAsync(string email, string? name, string? avatarUrl); //update + insert new google login to our db
     }
 }

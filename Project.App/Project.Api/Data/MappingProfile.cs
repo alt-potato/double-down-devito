@@ -8,6 +8,10 @@ public class MappingProfile : Profile
 {
     public MappingProfile()
     {
+        CreateMap<User, UserDTO>();
+        CreateMap<CreateUserDTO, User>();
+        CreateMap<UpdateUserDTO, User>();
+
         CreateMap<Hand, HandDTO>().ReverseMap();
         CreateMap<Hand, HandUpdateDTO>().ReverseMap();
         CreateMap<Hand, HandPatchDTO>().ReverseMap();
