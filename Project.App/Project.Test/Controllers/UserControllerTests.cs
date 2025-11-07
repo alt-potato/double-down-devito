@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Project.Api.Controllers;
-using Project.Api.Models;
+using Project.Api.DTOs;
 using Project.Api.Services.Interface;
+using Project.Api.Utilities;
 
-namespace Project.Tests.Controllers
+namespace Project.Test.Controllers
 {
     public class UserControllerTests
     {
@@ -18,18 +19,18 @@ namespace Project.Tests.Controllers
         }
 
         [Fact]
-        public async Task GetAllUsers_ReturnsOkResult_WithListOfUsers()
+        public async Task GetAllUsers_ReturnsOkResult_WithUsers()
         {
             // Arrange
-            var users = new List<User>
+            var users = new List<UserDTO>
             {
-                new User
+                new()
                 {
                     Id = Guid.NewGuid(),
                     Name = "Sneha",
                     Email = "sneha@example.com",
                 },
-                new User
+                new()
                 {
                     Id = Guid.NewGuid(),
                     Name = "Leo",
@@ -43,8 +44,8 @@ namespace Project.Tests.Controllers
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnUsers = Assert.IsAssignableFrom<IEnumerable<User>>(okResult.Value);
-            Assert.Equal(2, ((List<User>)returnUsers).Count);
+            var returnUsers = Assert.IsAssignableFrom<IEnumerable<UserDTO>>(okResult.Value);
+            Assert.Equal(2, ((List<UserDTO>)returnUsers).Count);
         }
 
         [Fact]
@@ -52,7 +53,7 @@ namespace Project.Tests.Controllers
         {
             // Arrange
             var userId = Guid.NewGuid();
-            var user = new User
+            var user = new UserDTO
             {
                 Id = userId,
                 Name = "Sneha",
@@ -65,7 +66,7 @@ namespace Project.Tests.Controllers
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnUser = Assert.IsType<User>(okResult.Value);
+            var returnUser = Assert.IsType<UserDTO>(okResult.Value);
             Assert.Equal(userId, returnUser.Id);
         }
 
@@ -74,7 +75,7 @@ namespace Project.Tests.Controllers
         {
             // Arrange
             var userId = Guid.NewGuid();
-            _mockSvc.Setup(s => s.GetUserByIdAsync(userId)).ReturnsAsync((User?)null);
+            _mockSvc.Setup(s => s.GetUserByIdAsync(userId)).ReturnsAsync((UserDTO?)null);
 
             // Act
             var result = await _controller.GetUserById(userId);
@@ -87,59 +88,74 @@ namespace Project.Tests.Controllers
         public async Task CreateUser_ReturnsCreatedAtAction()
         {
             // Arrange
-            var user = new User
+            var createUserDto = new CreateUserDTO { Name = "Sneha", Email = "sneha@example.com" };
+            var createdUser = new UserDTO
             {
                 Id = Guid.NewGuid(),
                 Name = "Sneha",
                 Email = "sneha@example.com",
             };
-            _mockSvc.Setup(s => s.CreateUserAsync(It.IsAny<User>())).ReturnsAsync((User u) => u);
+            _mockSvc.Setup(s => s.CreateUserAsync(createUserDto)).ReturnsAsync(createdUser);
 
             // Act
-            var result = await _controller.CreateUser(user);
+            var result = await _controller.CreateUser(createUserDto);
 
             // Assert
             var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
-            var returnUser = Assert.IsType<User>(createdResult.Value);
-            Assert.Equal(user.Id, returnUser.Id);
+            var returnUser = Assert.IsType<UserDTO>(createdResult.Value);
+            Assert.Equal(createdUser.Id, returnUser.Id);
         }
 
         [Fact]
-        public async Task UpdateUser_ReturnsNoContent_WhenSuccessful()
+        public async Task UpdateUser_ReturnsOk_WhenSuccessful()
         {
             // Arrange
             var userId = Guid.NewGuid();
-            var existingUser = new User { Id = userId, Name = "Old Name" };
-            var updatedUser = new User { Id = userId, Name = "New Name" };
+            var updateUserDto = new UpdateUserDTO { Name = "New Name" };
+            var updatedUser = new UserDTO { Id = userId, Name = "New Name" };
 
-            _mockSvc.Setup(s => s.GetUserByIdAsync(userId)).ReturnsAsync(existingUser);
-            _mockSvc
-                .Setup(s => s.UpdateUserAsync(userId, It.IsAny<User>()))
-                .ReturnsAsync(updatedUser);
+            _mockSvc.Setup(s => s.UpdateUserAsync(userId, updateUserDto)).ReturnsAsync(updatedUser);
 
             // Act
-            var result = await _controller.UpdateUser(userId, updatedUser);
+            var result = await _controller.UpdateUser(userId, updateUserDto);
 
             // Assert
-            Assert.IsType<NoContentResult>(result);
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var returnUser = Assert.IsType<UserDTO>(okResult.Value);
+            Assert.Equal(userId, returnUser.Id);
+            Assert.Equal("New Name", returnUser.Name);
+        }
+
+        [Fact]
+        public async Task UpdateUser_ReturnsNotFound_WhenUserDoesNotExist()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var updateUserDto = new UpdateUserDTO { Name = "New Name" };
+
+            _mockSvc
+                .Setup(s => s.UpdateUserAsync(userId, updateUserDto))
+                .ReturnsAsync((UserDTO)null!);
+
+            // Act
+            var result = await _controller.UpdateUser(userId, updateUserDto);
+
+            // Assert
+            Assert.IsType<NotFoundObjectResult>(result.Result);
         }
 
         [Fact]
         public async Task DeleteUser_ReturnsNoContent_WhenSuccessful()
         {
+            // Arrange
             var userId = Guid.NewGuid();
-            var user = new Project.Api.Models.User
-            {
-                Id = userId,
-                Name = "Sneha",
-                Email = "sneha@example.com",
-            };
 
-            _mockSvc.Setup(s => s.GetUserByIdAsync(userId)).ReturnsAsync(user);
             _mockSvc.Setup(s => s.DeleteUserAsync(userId)).ReturnsAsync(true);
 
+            // Act
             var result = await _controller.DeleteUser(userId);
 
+            // Assert
             Assert.IsType<NoContentResult>(result);
         }
 
@@ -148,7 +164,10 @@ namespace Project.Tests.Controllers
         {
             // Arrange
             var userId = Guid.NewGuid();
-            _mockSvc.Setup(s => s.DeleteUserAsync(userId)).ReturnsAsync(false);
+
+            _mockSvc
+                .Setup(s => s.DeleteUserAsync(userId))
+                .ThrowsAsync(new NotFoundException($"User with ID {userId} not found."));
 
             // Act
             var result = await _controller.DeleteUser(userId);
